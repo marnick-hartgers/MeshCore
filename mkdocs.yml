@@ -17,3 +17,20 @@ theme:
 
 extra_css:
   - _stylesheets/extra.css
+
+nav:
+  - Introduction: index.md
+  - FAQ: faq.md
+  - CLI Commands: cli_commands.md
+  - Companion Protocol: companion_protocol.md
+  - Terminal Chat CLI: terminal_chat_cli.md
+  - KISS Modem Protocol: kiss_modem_protocol.md
+  - Reference:
+      - Core Library Architecture: architecture.md
+      - Packet Format: packet_format.md
+      - Payloads: payloads.md
+      - Number Allocations: number_allocations.md
+      - Stats Binary Frames: stats_binary_frames.md
+      - QR Codes: qr_codes.md
+      - nRF52 Power Management: nrf52_power_management.md
+  - Building These Docs: docs.md
