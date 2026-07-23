@@ -26,10 +26,16 @@ bool Screen_Advert::handleInput(char c) {
     return true;
   }
   if (c == KEY_ENTER || c == KEY_SELECT) {
-    _task->notify(UIEventType::ack);
+    // Phase 7: notify() only fires on a successful send now (UIEventType::
+    // advertSent, independently configurable/mutable via
+    // Screen_NotificationSettings) -- previously this unconditionally played
+    // the generic "ack" confirmation tone before knowing the result, which
+    // doesn't match "advert" being its own distinguishable notification type.
     if (the_mesh.advert()) {
+      _task->notify(UIEventType::advertSent);
       _toast.show("Advert sent!", 1000);
       _task->logEvent("Advert sent");
+      _task->logRecentEvent("Advert sent");
     } else {
       _toast.show("Advert failed..", 1000);
       _task->logEvent("Advert failed");

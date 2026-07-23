@@ -6,7 +6,7 @@ at the end of each phase (or when a phase's plan changes) before starting the ne
 
 ## Phase 0 — Framework skeleton: DONE (build-verified on 4 boards, device-verified on 1)
 
-Spec: `phases/phase-0-framework-skeleton.md`.
+Spec: `phases/completed/phase-0-framework-skeleton.md`.
 
 ### Built
 
@@ -102,7 +102,7 @@ coverage and has the advantage of actually being tested on hardware.
 
 ## Phase 1 — Parity with ui-new (+ ui-tiny's best bits): BUILD NOT YET VERIFIED (no `pio` in this dev environment)
 
-Spec: `phases/phase-1-parity-with-ui-new.md`. Code for every item in that spec has been
+Spec: `phases/completed/phase-1-parity-with-ui-new.md`. Code for every item in that spec has been
 written; nobody has run `pio run` or flashed a board for Phase 1 yet (this dev environment
 has no `pio` on PATH, same limitation noted at the end of Phase 0). **The user will build
 and flash `WioTrackerL1_companion_radio_forest_ble` next** -- treat Phase 1 as code-complete
@@ -200,7 +200,7 @@ All new files, flat in `examples/companion_radio/ui-forest/` per PLAN.md §4:
 
 - No `pio run` in this environment -- **zero Phase 1 code has been build-verified**, let alone
   flashed. This is the first thing to do before trusting anything else in this section.
-- Manual test checklist (`phases/phase-1-parity-with-ui-new.md`'s "Done-when" block) not run
+- Manual test checklist (`phases/completed/phase-1-parity-with-ui-new.md`'s "Done-when" block) not run
   on any board yet.
 - `HAS_TORCH` and `PIN_STATUS_LED` branches are compile-shaped ports with no hardware to
   verify them against (no Phase 1 pilot has either pin defined).
@@ -212,7 +212,7 @@ All new files, flat in `examples/companion_radio/ui-forest/` per PLAN.md §4:
 
 ## Phase 2 — Navigation & data browsing: DONE (device-verified on WioTrackerL1)
 
-Spec: `phases/phase-2-navigation-and-data-browsing.md`. Code was written and manually traced
+Spec: `phases/completed/phase-2-navigation-and-data-browsing.md`. Code was written and manually traced
 against the actual headers (`BaseChatMesh.h`, `ContactInfo.h`, `ChannelDetails.h`,
 `AdvertDataHelpers.h`, `DisplayDriver.h`, `Utils.h`) instead of a real compile in this dev
 environment (no `pio`/`g++` on PATH here, same limitation as Phases 0/1). The user then built
@@ -320,7 +320,7 @@ All new, flat in `examples/companion_radio/ui-forest/` per PLAN.md §4:
 - `RAK_4631` and `gat562_30s_mesh_kit` (2 of PLAN.md's 3 named pilots) are still **build-verified
   only** for Phase 2 -- only `WioTrackerL1` has been physically tested, same gap as Phase 0/1.
 - `heltec_rc32` (rotary pilot) is still build-verified only, not device-tested.
-- Manual test checklist (`phases/phase-2-navigation-and-data-browsing.md`'s "Done-when" block)
+- Manual test checklist (`phases/completed/phase-2-navigation-and-data-browsing.md`'s "Done-when" block)
   hasn't been formally run/recorded on any board -- the WioTrackerL1 pass so far was informal
   ("works great" + the status bar report), not a checklist pass.
 - Real contact/channel data was exercised informally on WioTrackerL1 but scroll-into-view once a
@@ -334,7 +334,7 @@ All new, flat in `examples/companion_radio/ui-forest/` per PLAN.md §4:
 
 ## Phase 3 — Settings: DONE (device-verified on WioTrackerL1)
 
-Spec: `phases/phase-3-settings.md`. Code was hand-traced against the real headers
+Spec: `phases/completed/phase-3-settings.md`. Code was hand-traced against the real headers
 (`NodePrefs.h`, `MyMesh.h`/`.cpp`, `RadioLibWrappers.h`, `DisplayDriver.h`, `UIScreen.h`) instead
 of a real compile -- same limitation as every prior phase. One real bug was found and fixed
 during that trace (see "Real bug found during tracing" below); an independent second-pass review
@@ -350,7 +350,7 @@ after reboot -- the single highest-risk item this phase, per phase-3-settings.md
 settings survive a reboot, and general menu navigation ("some of the older features" -- an
 informal regression pass, not a full checklist run) all work with no new issues. The known
 status-bar-overlap bug carried forward from Phase 2 is present and unchanged, nothing new. This
-was **not** a formal checklist pass (`phases/phase-3-settings.md`'s "Done-when" block hasn't been
+was **not** a formal checklist pass (`phases/completed/phase-3-settings.md`'s "Done-when" block hasn't been
 explicitly run/recorded) and did **not** specifically exercise:
 - Danger Zone (`Screen_SettingsDanger`'s Erase/New Identity/Reboot) -- none of the three were
   triggered.
@@ -558,11 +558,11 @@ concrete example of why "trace carefully" matters here, not just a formality.
 - The independent second-pass code review (via a subagent) that was meant to catch anything the
   author's own trace missed did not complete -- the org's monthly spend limit was hit mid-review.
   Only the author's hand-trace plus this informal device pass have checked this code; no formal
-  checklist run (`phases/phase-3-settings.md`'s "Done-when" block) yet.
+  checklist run (`phases/completed/phase-3-settings.md`'s "Done-when" block) yet.
 
 ## Phase 4 — Diagnostics ("nerd stats"): DEVICE-TESTED ON WioTrackerL1, ONE BUG FOUND AND FIXED
 
-Spec: `phases/phase-4-diagnostics.md`. Code was hand-traced against the real headers
+Spec: `phases/completed/phase-4-diagnostics.md`. Code was hand-traced against the real headers
 (`Dispatcher.h`, `RadioLibWrappers.h`, `MyMesh.h`/`.cpp`, `main.cpp`, `StatsFormatHelper.h`,
 `UIScreen.h`, `DisplayDriver.h`) instead of a real compile -- same limitation as every prior
 phase (no `pio`/`g++` on PATH in this dev environment). The user then flashed
@@ -759,7 +759,7 @@ that's still outstanding (see below).
   the Diagnostics menu, its four sub-screens, and general navigation were reported as looking good;
   one real bug (status bar flash) was found and fixed as a result, and the status-bar/menu overlap
   bug (carried forward from Phase 2) was reconfirmed present. This was **not** a formal checklist
-  pass (`phases/phase-4-diagnostics.md`'s "Done-when" block hasn't been explicitly run/recorded),
+  pass (`phases/completed/phase-4-diagnostics.md`'s "Done-when" block hasn't been explicitly run/recorded),
   and did **not** specifically confirm:
   - **Whether the Diagnostics values actually match the companion app's stats view side-by-side**,
     per the checklist's own explicit requirement -- this was traced against the same wire-protocol
@@ -782,7 +782,7 @@ that's still outstanding (see below).
 
 ## Phase 5 — Visual polish: CODE COMPLETE, ENTIRELY BUILD-UNVERIFIED (no device pass yet)
 
-Spec: `phases/phase-5-visual-polish.md`. Code was hand-traced against the real headers
+Spec: `phases/completed/phase-5-visual-polish.md`. Code was hand-traced against the real headers
 (`Adafruit_GFX`/`Adafruit_SH110X`/`Adafruit_SSD1306`/`Adafruit_ST7789`/`GxEPD2_BW` for the
 text-wrap fix, plus all ten `DisplayDriver` backend `.cpp` files for the same "confirm every
 backend, don't assume" discipline the Phase 4 status-bar-flash fix used) -- same no-`pio`/no-`g++`
@@ -816,7 +816,7 @@ specifically; `lilygo_techo` is new as of this phase and covered in "Not yet don
   this phase** -- the user flagged it as an easy regression check to do early on real hardware, but
   no device pass has happened yet at all (see "Not yet done" below). Still believed correct from the
   Phase 4 trace; just not re-confirmed.
-- **`phases/phase-5-visual-polish.md`'s "Prerequisites" section undersells `RAK_4631`/
+- **`phases/completed/phase-5-visual-polish.md`'s "Prerequisites" section undersells `RAK_4631`/
   `gat562_30s_mesh_kit`/`heltec_rc32` as needing only "a regression sweep".** Per the user: none of
   the three has ever been physically tested on any phase 0-4 -- only `WioTrackerL1` has. Phase 5's
   hardware pass on those three is their *first* test of everything built so far, not a regression
@@ -1026,7 +1026,7 @@ none has been device-confirmed yet, same as the rest of Phase 5.
 
 ## Phase 6 — Input/control expansion: REGRESSION-CLEARED ON WioTrackerL1, NEW CAPABILITIES STILL ENTIRELY UNVERIFIED (no lilygo_tdeck/sensecap_indicator-espnow hardware available)
 
-Spec: `phases/phase-6-input-control-expansion.md`. Same no-`pio`/no-`g++` limitation as every
+Spec: `phases/completed/phase-6-input-control-expansion.md`. Same no-`pio`/no-`g++` limitation as every
 prior phase, plus a bigger one specific to this phase: `lilygo_tdeck`'s keyboard co-processor
 and trackball, and `sensecap_indicator-espnow`'s touch panel, are the first *new hardware
 capabilities* (not just new screens/menus over what Phases 0-5 already exercised) this project
@@ -1246,3 +1246,385 @@ compiler/sanitizer -- same category of bug as Phase 3's `TextField::begin()` buf
   phase's status line reads.
 - `RAK_4631`/`gat562_30s_mesh_kit`/`heltec_rc32`/`lilygo_techo` remain build-unverified for this
   phase (same gap carried since Phase 0) -- only `WioTrackerL1` has any hardware track record.
+
+## Phase 7 — Notifications: CODE COMPLETE, ENTIRELY BUILD-UNVERIFIED (no `pio`/`g++` in this dev environment, not yet flashed)
+
+Spec: `phases/completed/phase-7-notifications.md`. Code was hand-traced against the real headers
+(`AbstractUITask.h`, `MenuScreen.h`/`.cpp`, `FormField.h`/`.cpp`, `EventLog.h`, `UITask.h`/`.cpp`,
+`MyMesh.cpp`) instead of a real compile -- same no-`pio`/no-`g++` limitation as every prior phase.
+Unlike most prior phases, nothing in this phase has been flashed yet by anyone (the WioTrackerL1
+device-test pattern every earlier phase eventually got hasn't happened for Phase 7 at this point) --
+treat every claim below as a paper argument until a build/flash happens, same caveat Phase 5 opened
+with before its own first hardware pass. Per the user's note at the start of this phase: only
+`WioTrackerL1` hardware is available for testing (not `lilygo_tdeck`/`sensecap_indicator-espnow`),
+which is irrelevant here anyway since this phase's pilots are back to the original three
+(`RAK_4631`/`gat562_30s_mesh_kit`/`heltec_rc32`, per phase-7-notifications.md's own "Pilot boards"
+section) -- none of the three has ever been physically tested on *any* phase of `ui-forest`, a gap
+carried since Phase 0, so a Phase 7 hardware pass on any of them would be a first-time run for
+everything built across Phases 0-7, not a regression check.
+
+### Resolved open question -- checked before building, not assumed
+
+phase-7-notifications.md's own "Open questions" section asks whether `NodePrefs` already has any
+per-event-type notification fields before adding new storage. Checked `NodePrefs.h` directly: it has
+exactly one buzzer-related field (`buzzer_quiet`, the existing global mute, Phase 1) and nothing
+per-event-type. Per-event config is therefore new storage -- see "Decisions" below for why it's
+scoped as UI-local (non-persisted) state rather than new `NodePrefs` fields, the same call Phase 3
+made for "vibration" and for the same reason.
+
+### Built
+
+All new, flat in `examples/companion_radio/ui-forest/` per PLAN.md §4, plus two small
+`examples/companion_radio/`-level edits this phase required:
+
+- **`AbstractUITask.h`** (not `ui-forest`, but required by it) -- one new `UIEventType` enum value,
+  `advertSent`, alongside the existing `contactMessage`/`channelMessage`/`roomMessage`/
+  `newContactMessage`/`ack`. Confirmed safe to add without touching `ui-new`/`ui-tiny`/`ui-orig`:
+  grepped every `notify()` implementation in all three and each already ends its `switch(t)` with a
+  `default:` case, so a new enum value is a silent no-op there, not a compile warning/error.
+- **`NotificationPrefs.h`** -- new standalone header (per PLAN §4's "add files as needed... target
+  shape, not a checklist", same precedent as Phase 4's `EventLog.h`/`Transport.h`): a
+  `NotificationTypeConfig{bool buzzer; bool vibration;}` pair times four (`contactMessage`/
+  `channelMessage`/`ack`/`advertSent` -- phase-7-notifications.md's own "at minimum" list), owned by
+  `UITask` as `_notify_prefs` and read every `notify()` call.
+- **`Screen_NotificationEventConfig.h`/`.cpp`** -- new, not literally in PLAN §4's file list but
+  covered by its "add files as needed" caveat (same shape as Phase 4's `EventLog.h` precedent): one
+  reusable per-event-type sub-screen, instantiated four times (once per configurable event type),
+  each a thin `MenuScreen` with a "Buzzer" `Toggle` row and (only `#ifdef PIN_VIBRATION`) a
+  "Vibration" `Toggle` row, both operating directly on the `NotificationTypeConfig&` this instance
+  was built with -- no `the_mesh.savePrefs()` call anywhere in this class, unlike every other
+  `Toggle` row in this codebase, since there's no persisted field to write (see "Decisions").
+- **`Screen_NotificationSettings.h`/`.cpp`** -- per PLAN §4's file list. Root menu, 4 `Submenu` rows
+  (Message/Channel Message/Ack/Advert), each pushing one of four `Screen_NotificationEventConfig`
+  instances held as plain member objects (not `UITask`-owned pointers) -- see "Decisions" below for
+  why. This is what `Screen_SettingsDevice`'s "Notifications" stub (Phase 3, previously a toast
+  placeholder) now pushes, per phase-7-notifications.md step 3.
+- **`Screen_RecentEvents.h`/`.cpp`** -- per PLAN §4's file list. User-facing notification history,
+  reusing `EventLog` (Phase 4's ring-buffer class) but as a second, separately-fed instance
+  (`UITask::_recent_events`) rather than a filtered view over the Phase 4 diagnostic `_event_log` --
+  see "Decisions" below for why a second buffer was chosen over a shared-buffer-with-filter. Render/
+  scroll logic is a near-duplicate of `Screen_EventLog` (same newest-first, age-prefixed,
+  `Layout`-scrolled shape) -- kept as its own class/file rather than parameterizing `Screen_EventLog`
+  with a title, matching PLAN §4's explicit two-file listing and the phase's own framing that these
+  "remain separate screens for two different audiences" even where the buffer class is shared.
+- **`UITask.h`/`.cpp`** -- new members: `NotificationPrefs _notify_prefs`, a second `EventLog
+  _recent_events`, `Screen_NotificationSettings* _notification_settings`, `Screen_RecentEvents*
+  _recent_events_screen`; new `logRecentEvent(const char*)` passthrough (mirrors `logEvent()`'s
+  shape). `begin()` constructs `_notification_settings` before `_settings_device` (which needs a
+  pointer to it, same "leaf before container" ordering every prior phase's settings/diagnostics
+  sub-screens already follow) and `_recent_events_screen` alongside the other top-level leaf screens.
+  Home gained a "Recent Events" entry (deliberately distinct from the existing Phase 1 "Recent" entry
+  -- see "Decisions"), inserted right before "Diagnostics"; `UI_FOREST_HOME_ITEM_COUNT` bumped 12 ->
+  13. `notify()` rewritten: a new per-event-type gating switch (`buzzer_on`/`vibration_on`, read from
+  `_notify_prefs`) runs before the existing tune-selection switch and the existing `PIN_VIBRATION`
+  trigger, plus a new `advertSent` tune case and a new Recent Events feed switch (see "Decisions" for
+  which events feed it and why).
+- **`Screen_SettingsDevice.h`/`.cpp`** -- "Notifications" row changed from `MenuItemKind::Action`
+  (toasting a Phase-3 placeholder) to `MenuItemKind::Submenu` pointing at the new
+  `Screen_NotificationSettings` instance, passed in as a new constructor parameter
+  (`UIScreen* notificationSettings`). `showNotificationsStub()` removed (dead code once the real
+  screen exists). The existing "Buzzer" `Toggle` row is untouched -- still a valid quick top-level
+  mute path (Settings > Device > Buzzer), see "Decisions" for why it wasn't removed.
+- **`Screen_Advert.cpp`** -- `KEY_ENTER`/`KEY_SELECT` handler restructured: `notify()` now fires only
+  on a successful `the_mesh.advert()` call, with `UIEventType::advertSent` instead of the generic
+  `UIEventType::ack` it used unconditionally before this phase (see "Decisions"). Also calls the new
+  `logRecentEvent("Advert sent")` alongside the existing Phase 4 `logEvent("Advert sent")` call, on
+  success only.
+
+### Decisions / deviations worth knowing about
+
+- **Per-event-type notification config is UI-local (non-persisted) state, not new `NodePrefs`
+  fields.** Same reasoning as Phase 3's "Vibration" decision, reapplied here for the same open
+  question phase-7-notifications.md itself raises: `NodePrefs` is a hand-maintained, unversioned,
+  fixed-byte-offset binary format (`DataStore.cpp`'s `loadPrefsInt()`/`savePrefs()`) with no length
+  guard, and extending it without a compiler on PATH to verify the change is real structural surgery
+  on existing users' saved prefs files, not a UI-only change. Consequence: per-event-type buzzer/
+  vibration settings reset to all-on on every reboot -- a known gap, same shape as (and now alongside)
+  the still-open vibration-persistence gap from Phase 3. phase-7-notifications.md's own "Data / API
+  dependencies" section explicitly sanctions scoping this as UI-local state "unless there's already a
+  companion-app-facing pref for this" -- checked `NodePrefs.h` directly and confirmed there isn't one
+  (see "Resolved open question" above), so this is the intended, not a corner-cut, resolution.
+- **LED is not part of the per-event-type config**, even though phase-7-notifications.md's wording
+  ("buzzer tune + vibration + LED") names it as one of the three axes. `UITask::userLedHandler()`
+  (Phase 1) is a generic heartbeat blink keyed off `_msgcount`, never routed through `notify()` or any
+  per-event trigger point at all -- there's nothing per-event to gate today, so adding one would be
+  new LED-trigger plumbing, not a config knob layered on existing behavior. The phase's own framing
+  ("extend to whatever event types Phase 1's ported buzzer/vibration/LED code already distinguishes")
+  is read as scoping this to what already exists, not as a mandate to invent per-event LED behavior
+  from scratch -- left out rather than built speculatively with no hardware to verify against.
+- **`ack`'s per-type config row is real and does something (gates the "ack" tune/vibration), but
+  `ack` events are deliberately NOT fed into Screen_RecentEvents**, even though
+  phase-7-notifications.md's own done-when checklist literally lists "ack" as one of the four event
+  types Recent Events should show. Checked where `notify(UIEventType::ack)` is actually called from
+  in this codebase (grep, not assumed): `Screen_Advert.cpp` (before this phase's fix) and
+  `UITask::toggleGPS()`/`toggleBuzzer()` -- three call sites, all local UI-action confirmation tones,
+  **zero of them a real mesh delivery-ack notification** (`MyMesh.cpp` never calls
+  `notify(UIEventType::ack)` at all). Logging every "ack" firing to Recent Events would mean every
+  GPS/buzzer toggle shows up as generic, meaningless "Ack" entries in a screen meant to be a
+  non-technical user's notification history -- same toggle-noise reasoning Phase 4 already used to
+  exclude `ack` from the diagnostic event log, reapplied here. This is a deliberate, reasoned deviation
+  from the checklist's literal wording, not an oversight -- flagged here the same way prior phases have
+  flagged premises that didn't hold (e.g. the advert-interval question in Phase 3).
+- **"Last contact seen" (phase-7-notifications.md step 1's example content) is fed via the
+  `newContactMessage` proxy, not a real contact-discovery hook** -- `MyMesh::onDiscoveredContact` only
+  ever writes to `_serial`, never touches `_ui` (confirmed by reading it, the identical finding Phase
+  4 already made when it used the same proxy for its own diagnostic log's "New contact message"
+  entry). Adding a real hook would be exactly the new Mesh/MyMesh callback plumbing this phase's own
+  "Data / API dependencies" section says not to add. `newContactMessage` doesn't play a buzzer tune
+  today (falls through `notify()`'s default case, unchanged), but it does still trigger vibration
+  unconditionally when `PIN_VIBRATION` is defined (also unchanged) -- so it still satisfies the
+  phase's "subset of events that also buzz/vibrate" framing for Recent Events on vibration-equipped
+  boards, even though it's excluded from the configurable-per-type list (see next point).
+- **Only `contactMessage`/`channelMessage`/`ack`/`advertSent` are independently configurable and gated
+  in `notify()`; `roomMessage`/`newContactMessage` fall through the `default:` case in every one of
+  `notify()`'s three switches (gating/tune/Recent-Events-feed) and keep their exact pre-Phase-7
+  behavior** (`roomMessage`: logs to the diagnostic event log, no tune, unconditional vibration, not
+  fed to Recent Events; `newContactMessage`: same, but is fed to Recent Events as "New contact" per
+  the point above). This matches phase-7-notifications.md's own "at minimum" framing for the
+  configurable set -- extending granularity to these two wasn't asked for and neither has a
+  distinguishable tune to gate in the first place.
+- **`Screen_Advert`'s confirmation tone changed from unconditional `ack` to success-only
+  `advertSent`.** Before this phase, `Screen_Advert::handleInput()` called
+  `_task->notify(UIEventType::ack)` immediately on `KEY_ENTER`, before knowing whether
+  `the_mesh.advert()` would succeed -- a tactile "you pressed the button" chirp, not a "the advert was
+  sent" notification. Phase 7 needs advert to be its own independently-configurable/mutable
+  notification type (phase-7-notifications.md's own event-type list), so it was moved to fire only on
+  success, using the new `advertSent` type. This is a deliberate, small behavior change (the tone no
+  longer plays on a failed advert attempt) -- flagged here since nobody has felt this on hardware yet
+  to confirm it doesn't feel like "the button did nothing" on failure (the toast "Advert failed.."
+  still fires regardless, so there is still failure feedback, just not a tone).
+- **The four `Screen_NotificationEventConfig` sub-screens are plain member objects of
+  `Screen_NotificationSettings`, not `UITask`-owned pointers `new`'d in `begin()`.** Every other
+  screen in this codebase is individually `new`'d in `UITask::begin()` and referenced via a `UITask`
+  member pointer; these four are instead constructed as part of `Screen_NotificationSettings`'s own
+  construction (itself `new`'d exactly once in `UITask::begin()`, same as everything else) --
+  `Screen_NotificationSettings` is heap-allocated once and never moved afterward, so its member
+  sub-objects have stable addresses for the process lifetime, and `NavStack::push()` only ever needs a
+  stable `UIScreen*`. Chosen to avoid four more pointer members + four more `new` call sites cluttering
+  `UITask.h`/`.cpp` for something that's purely internal to one menu -- no other screen in this
+  codebase is referenced from outside its own parent menu, so nothing needed a `UITask`-visible pointer
+  to any of the four anyway. The "no allocation outside setup" rule still holds -- these four are
+  allocated together with their parent, which is itself allocated exactly once in `begin()`.
+- **`Screen_NotificationSettings`'s "Notifications" entry point keeps `Screen_SettingsDevice`'s
+  existing "Buzzer" toggle row untouched, rather than removing it now that per-event config exists.**
+  phase-7-notifications.md is explicit that the global mute "must still exist and still work as a fast
+  top-level action... don't remove it, this phase adds granularity on top, it doesn't take away the
+  quick path." The triple-click gesture (Phase 1, still unconditional at Home depth) and this Buzzer
+  toggle are both already-working quick paths -- neither needed a code change to keep satisfying that
+  requirement, so neither was touched.
+- **A latent, pre-existing (not Phase-7-introduced) concern noticed while tracing
+  `Screen_NotificationEventConfig`/`Screen_NotificationSettings`'s construction, not fixed this
+  phase:** `MenuScreen`'s constructor (Phase 0, extended Phase 5) scans `_items[i].icon` to compute
+  `_has_icons` *before* the derived class's own constructor body has run -- by the standard's object
+  member-initialization order (bases, then derived members, then derived constructor body), this reads
+  each `MenuItem`'s fields before the derived class's `MenuItem _rows[N]` array member has itself been
+  constructed, which for the built-in-typed fields (`icon` among them) leaves them indeterminate at
+  that point rather than reliably `NULL`. This is not new to Phase 7 -- it's the exact same pattern
+  every existing `MenuScreen` subclass in this codebase already uses (`Screen_SettingsDevice`,
+  `Screen_Settings`, `Screen_Diagnostics`, etc., all the way back through Phase 5's introduction of
+  `_has_icons`), and nothing has been device-reported as wrong because of it so far -- most likely
+  because this project's `new`-once-at-boot allocations land on freshly-zeroed embedded RAM in
+  practice, masking what is technically indeterminate-value read. Not fixed here: it's a `MenuScreen`
+  base-class concern spanning every phase back to Phase 5, well outside this phase's stated scope, and
+  not something to touch without a compiler/sanitizer available to verify a fix. Flagged so it isn't
+  rediscovered as a mystery later, same spirit as prior phases' incidental-finding notes.
+
+### Not yet done / needs hardware verification
+
+- **Nothing in Phase 7 has been flashed or built with a real compiler.** Same no-`pio`/no-`g++`
+  limitation as every prior phase. Unlike most prior phases, there isn't even an informal
+  `WioTrackerL1` pass yet for this phase specifically -- that needs to happen before trusting anything
+  above.
+- `RAK_4631`/`gat562_30s_mesh_kit`/`heltec_rc32` (this phase's actual three pilots, per
+  phase-7-notifications.md) have never been physically tested on **any** phase of `ui-forest` --
+  same gap carried since Phase 0, and per this phase's own note, no `lilygo_tdeck`/
+  `sensecap_indicator-espnow` hardware is available either, though that's irrelevant here since
+  neither is a Phase 7 pilot.
+- The phase's own manual test checklist (`phases/completed/phase-7-notifications.md`'s "Done-when" block) has
+  not been run on any board.
+- Highest-priority checks once a build is available: does triggering each of message/channel
+  message/advert actually show up in `Screen_RecentEvents` with correct ordering/content (age-prefix
+  counting up correctly, newest-first, 20-entry drop-oldest -- same mechanics as Phase 4's
+  `Screen_EventLog`, which itself was flagged as not specifically hardware-confirmed either); does
+  muting one event type in `Screen_NotificationSettings` actually leave the others' tones/vibration
+  untouched; does the still-working global mute (triple-click, and Settings > Device > Buzzer) still
+  silence everything regardless of per-type settings (it should, since `buzzer.play()`'s own
+  `_is_quiet` check inside `genericBuzzer` -- confirmed by reading `buzzer.cpp` -- gates every tone
+  independently of and after the new per-type `buzzer_on` gate, so global mute should still win
+  either way -- not yet confirmed on hardware).
+- `Screen_Advert`'s success-only `advertSent` tone change (see "Decisions") has never been tried --
+  worth deliberately triggering a failed advert send (if there's a way to force one) to confirm the
+  toast-only failure feedback doesn't feel like a dead button.
+- Per-event settings resetting on reboot (the UI-local, non-persisted design choice, see "Decisions")
+  has not been demonstrated on hardware -- worth confirming the reset-to-all-on behavior is at least
+  not surprising/confusing in practice, given this phase adds a real settings surface with no
+  persistence, unlike every other settings screen in `ui-forest` so far.
+- The latent `MenuScreen`/`_has_icons` construction-order concern noted in "Decisions" is a paper
+  finding from tracing, not a confirmed bug -- nothing in Phase 7 sets any row's `icon` field, so this
+  phase's own screens aren't newly exposed to it in a way that would visibly misrender, but it's worth
+  a maintainer's attention independent of this phase.
+
+## Phase 8 — Hardening & rollout: ONE NEW BOARD ADDED (build-unverified), ONE COVERAGE ITEM COULDN'T BE FULFILLED (no candidate board exists), WioTrackerL1 REGRESSION-TRACED
+
+Spec: `phases/completed/phase-8-hardening-rollout.md`. This is the last phase in `PLAN.md`'s roadmap. Same
+no-`pio`/no-`g++` limitation as every prior phase; per the user's note at the start of this phase,
+only `WioTrackerL1` hardware is available (not the two new boards this phase would need to actually
+confirm), so everything below is hand-traced/grep-verified, not flashed. Phase 7 itself is still
+unflashed by anyone (see its own section above) -- this phase proceeds on top of it anyway per its
+own spec, which doesn't gate board-coverage widening on a formal Phase 0-7 checklist pass (none of
+which has happened on any board except informal `WioTrackerL1` passes) -- PLAN.md/phase-8's "Open
+questions" section confirms there's nothing outstanding from Section 8 blocking this.
+
+### Board candidates -- resolved by grep, not assumed
+
+- **GxEPD e-ink board: `ThinkNode_M1` chosen.** phase-8.md asks for a `GxEPDDisplay`/`E213Display`/
+  `E290Display`-backed variant other than `heltec_e213`/`lilygo_techo` (Phase 5's pilot). Grepped
+  `variants/*/platformio.ini` for `DISPLAY_CLASS=(E213Display|E290Display|GxEPDDisplay)`: 9 boards
+  match (`lilygo_techo`, `thinknode_m1`, `lilygo_techo_lite`, `mesh_pocket`, `heltec_e290`,
+  `wio-tracker-l1-eink`, `thinknode_m5`, `heltec_wireless_paper`, `heltec_e213`). Narrowed to boards
+  using the literal `GxEPDDisplay` class (wraps `GxEPD2_BW`, vendored in-repo, same class Phase 5's
+  `lilygo_techo` pilot already validated the text-wrap fix against) rather than `E213Display`/
+  `E290Display` (external `heltec-eink-modules` library, not vendored -- same reason Phase 5 passed
+  over `heltec_e213`): `thinknode_m1`, `mesh_pocket`, `wio-tracker-l1-eink`, `thinknode_m5`,
+  `lilygo_techo_lite` remain. Picked `thinknode_m1` -- it already builds `companion_radio_ble`/`_usb`
+  with `ui-new` today (confirmed by reading its `platformio.ini`), has a single-button input scheme
+  (`PIN_USER_BTN`, no joystick/rotary/touch -- `PIN_BUTTON2` exists but is only `pinMode()`'d in
+  `variant.cpp`, never wired to a `MomentaryButton` or a `BACKLIGHT_BTN`/`HAS_TORCH` macro, so it's
+  inert as far as `ui-forest` is concerned), and defines `ENV_INCLUDE_GPS=1`/`PIN_BUZZER=6`/
+  `AUTO_SHUTDOWN_MILLIVOLTS=3300`/`MAX_CONTACTS=350` -- every one of those macros already individually
+  exercised by an existing forest pilot (`heltec_rc32`'s GPS, `GAT562`/`heltec_rc32`/`WioTrackerL1`'s
+  buzzer, `heltec_rc32`'s shutdown-voltage), so this board combines already-validated pieces rather
+  than introducing a genuinely new code path. Same `nrf52840_s140_v6_extrafs.ld`/`712704`-byte flash
+  budget as `RAK_4631`/`lilygo_techo`, so no new flash-headroom risk beyond the still-open one flagged
+  since Phase 3. **A genuine first for this project, noticed while reading `thinknode_m1/variant.h`:**
+  it's the first `ui-forest` board (pilot or otherwise, across all 8 phases) to actually define
+  `PIN_STATUS_LED` (`= LED_GREEN`, active-low per `LED_STATE_ON = LOW`) -- every prior phase flagged
+  `UITask::userLedHandler()` as "compiled but hardware-unverified, no pilot defines this pin." Read
+  `userLedHandler()`'s `digitalWrite(PIN_STATUS_LED, led_state == LED_STATE_ON)` line against this
+  board's `LED_STATE_ON=LOW` polarity to confirm it drives the LED the intended direction (it does --
+  the existing code already parameterizes polarity through the macro correctly, no fix needed) -- but
+  this is still only a compile-time trace, not a lit LED anyone has seen, since nobody has this board's
+  hardware. New env: `ThinkNode_M1_companion_radio_forest_ble` (`variants/thinknode_m1/platformio.ini`),
+  the same two-line-diff (`-I` path, `ui-*/*.cpp` glob) template every other forest env uses, built
+  from the existing `ThinkNode_M1_companion_radio_ble` env verbatim (including its
+  `+<helpers/ui/buzzer.cpp>`/`end2endzone/NonBlockingRTTTL` lib dep, per the Phase 0 finding that
+  `PIN_BUZZER`-defining boards need those regardless of which UI variant is compiled in).
+  `mesh_pocket`/`wio-tracker-l1-eink`/`thinknode_m5`/`lilygo_techo_lite` weren't individually
+  traced further once `thinknode_m1` looked like a clean, low-risk fit -- any of the four remains a
+  valid pick for a future phase/board-coverage pass if `thinknode_m1` turns out to have its own
+  issue once real hardware is available.
+- **LGFX/LovyanGFX RGB-panel board: no second candidate exists in this repo, confirmed by grep, not
+  guessed.** phase-8.md's own wording hedges this ("grep for other variants using
+  `helpers/ui/LGFXDisplay.cpp` in their `build_src_filter`" -- phrased as if one might exist).
+  Grepped `variants/*/platformio.ini` for `helpers/ui/LGFXDisplay\.cpp`: **exactly one match,
+  `sensecap_indicator-espnow`** (Phase 6's pilot). Widened the search in case another board used
+  LGFX under a different file name or wrapper class (`public LGFXDisplay`, `LGFX_Device`, `lgfx::` --
+  all across `variants/`): still exactly one match, `sensecap_indicator-espnow/SCIndicatorDisplay.h`.
+  Also listed every file in `src/helpers/ui/` directly: `LGFXDisplay.h`/`.cpp` is the only
+  LovyanGFX-based `DisplayDriver` backend in the whole framework. **Conclusion: this repo currently
+  has exactly one LGFX/LovyanGFX RGB-panel board, period** -- there is no second board to add
+  `ui-forest` coverage to for this display backend today. Not attempted: bringing up LGFX support on
+  a wholly new, not-yet-in-repo board is real board-bring-up work (vendor panel init sequences,
+  touch-controller config, pin mapping) with no hardware, no vendor datasheet, and no existing
+  in-repo reference beyond `sensecap_indicator-espnow`'s own config to trace against -- squarely
+  outside this phase's "widen coverage over existing variants" scope and the project's own standing
+  discipline of not guessing at unverifiable hardware specifics. This resolves phase-8.md's item 1
+  bullet for LGFX as "no action possible," not as a skipped task -- flagged here so a future session
+  doesn't waste time re-searching for a board that isn't there, and knows to check again once a new
+  LGFX-based board variant is added to the repo by someone else.
+
+### Fix board-specific breakage (item 2) -- none found requiring a code fix
+
+Hand-traced `thinknode_m1`'s full macro set against `ui-forest`'s existing `#ifdef` surface (the
+"Board configuration surface" table in `ARCHITECTURE.md`) rather than assumed: `PIN_USER_BTN`
+(single-button `InputRouter` path, identical to `RAK_4631`), `DISPLAY_CLASS=GxEPDDisplay` (identical
+backend to `lilygo_techo`, already carrying Phase 5's text-wrap fix and e-ink `StatusBar` gating),
+`PIN_BUZZER=6` (identical gating to `GAT562`/`heltec_rc32`/`WioTrackerL1`), `ENV_INCLUDE_GPS=1`
+(identical to `heltec_rc32`'s `Screen_Gps` wiring, via the same `ThinkNodeM1SensorManager::
+getLocationProvider()` shape `LilyGo_T-Echo`'s own GPS wiring already uses), `AUTO_SHUTDOWN_MILLIVOLTS=3300`
+(identical to `heltec_rc32`), `PIN_STATUS_LED` (new, see above -- traced, not fixed, since nothing
+was wrong). No `HAS_TORCH`, `BACKLIGHT_BTN`, `PIN_VIBRATION`, `UI_HAS_JOYSTICK`, `UI_HAS_ROTARY_INPUT`,
+`UI_SENSORS_PAGE`, or `HAS_TOUCH` defined for this board (confirmed by grep across
+`variants/thinknode_m1/`), so those code paths simply don't compile in, same as any other board
+lacking those macros -- nothing to fix there either. **No board-specific bug was found or fixed this
+phase** -- every macro this board sets was already individually exercised (compiled, hand-traced, or
+in `RAK_4631`/`lilygo_techo`/`heltec_rc32`'s case, device-tested) by an earlier phase against a
+different board, so this addition is a recombination of already-validated pieces, not new surface
+area. This differs from every phase 0-7 board addition, each of which found at least one real or
+latent issue while tracing -- flagged here in case that's a sign this pass wasn't thorough enough
+rather than a sign the code is simply solid; worth a second look once `thinknode_m1` hardware is
+available to actually flash.
+
+### WioTrackerL1 regression pass (hand-traced, not reflashed -- no new hardware pass happened this phase)
+
+Per the user's framing at the start of this phase, `WioTrackerL1` is "not new to this phase, but a
+regression pass on it is still worth doing since it's the only board with an actual hardware track
+record across every prior phase." Re-read Phase 7's full diff (`AbstractUITask.h`, `UITask.h`/`.cpp`,
+`Screen_Advert.cpp`, `Screen_SettingsDevice.h`/`.cpp`, plus the four new Phase 7 files) specifically
+against `WioTrackerL1`'s own macro set (`UI_HAS_JOYSTICK=1`, `PIN_BUZZER=12`, `UI_SENSORS_PAGE=1`, no
+`PIN_VIBRATION`, no `ENV_INCLUDE_GPS`) rather than re-running the Phase 7 trace in the abstract:
+
+- **Home's `MenuItem` array bounds, counted by hand:** `UITask::begin()`'s Home-building sequence
+  populates exactly 13 rows in the GPS+Sensors-present worst case (Status, Recent, Radio, Bluetooth,
+  Advert, Contacts, Channels, GPS, Sensors, Recent Events, Diagnostics, Settings, Shutdown) against
+  `_home_items[UI_FOREST_HOME_ITEM_COUNT]` where the macro is `13` -- exact match, no overflow.
+  `WioTrackerL1` itself only populates 12 (no `ENV_INCLUDE_GPS`), well within bounds either way.
+- **`notify()`'s new gating switch**, traced against `WioTrackerL1`'s macros specifically:
+  `buzzer_on`/`vibration_on` are declared unconditionally (`bool buzzer_on = true, vibration_on =
+  true;`), `buzzer_on` is read inside the `#if defined(PIN_BUZZER)` block (defined here, `=12`, so
+  this compiles and behaves as designed), `vibration_on` is only read inside `#ifdef PIN_VIBRATION`
+  (undefined on this board) -- the whole `vibration.trigger()` block compiles out entirely via that
+  guard, so `vibration_on` being otherwise "unused" on this board is a compiler warning at worst
+  (harmless, and not new -- boards without `PIN_VIBRATION` have always had unused vibration-related
+  locals in this class since Phase 1), not a functional regression.
+- **`Screen_NotificationSettings`'s four `Screen_NotificationEventConfig` member sub-objects**,
+  traced for the same base-before-derived-member construction-order concern already flagged in this
+  phase's own "Decisions" section above (the `MenuScreen`/`_has_icons` one) -- confirmed this is the
+  same already-documented latent issue, not a new instance of it: `_rows` (default-constructed) is
+  declared before the four `_cfg_*` members in `Screen_NotificationSettings.h`, matching both the
+  base `MenuScreen(...)` constructor's read-before-derived-members-exist ordering and the
+  initializer-list order in `Screen_NotificationSettings.cpp` -- consistent with, not worse than,
+  every other `MenuScreen` subclass already in this codebase.
+- **No `InputRouter`/`NavStack`/gesture-vocabulary change in Phase 7 at all** -- confirmed by re-diffing
+  (Phase 7 touches `notify()`, Home's item table, and two settings/advert screens, nothing under
+  `InputRouter.cpp`/`NavStack.h`) -- so `WioTrackerL1`'s joystick gesture mapping, `KEY_HOME`
+  triple-click behavior, and every Phase 0-6 screen it already exercises are untouched by construction,
+  not just by inspection.
+
+**Conclusion: nothing in Phase 7's diff, read against `WioTrackerL1`'s specific macro set, looks like
+it would regress anything the user has already confirmed working on that board.** This is a paper
+trace, not a reflash -- Phase 7 (and now Phase 8's own `ThinkNode_M1` addition) still needs an actual
+device pass before any of this is more than "didn't find a problem looking for one."
+
+### Migration/deprecation decision (item 3)
+
+Written as its own separate document, not part of this phase's code changes, per phase-8.md's
+explicit instruction and the user's own framing: this is not a decision to make unilaterally.
+See `MIGRATION-DECISION.md` (same directory) -- it lays out the tradeoffs and asks rather than
+recommends.
+
+### Not yet done / needs hardware verification
+
+- **`ThinkNode_M1_companion_radio_forest_ble` has never been built or flashed.** No `pio`/`g++` in
+  this dev environment, and nobody has this board's hardware -- same double-gap phase-8.md itself
+  predicted for both new boards. Highest-priority checks whenever hardware/a build environment
+  becomes available: does it actually compile (this hand-trace, unlike a real compiler, cannot catch
+  a typo/missing include); does `PIN_STATUS_LED`'s heartbeat actually blink correctly (first-ever
+  hardware exercise of that code path across every phase); does `GxEPDDisplay` behave the same as it
+  already does on `lilygo_techo` (expected, since it's the identical backend class, but not proven for
+  this specific panel/pinout combination); flash headroom, given `thinknode_m1`'s
+  `board_upload.maximum_size` is the same `712704` as `RAK_4631`/`lilygo_techo`, both still themselves
+  unconfirmed for headroom (see Phase 3's still-open flag).
+- **The LGFX RGB-panel coverage item could not be fulfilled** -- no second board exists in this repo
+  today (see above). Not a gap in this phase's execution; a gap in available board variants. Re-check
+  next time a new LGFX-based board is added to the repo.
+- `RAK_4631`/`gat562_30s_mesh_kit`/`heltec_rc32`/`lilygo_tdeck`/`sensecap_indicator-espnow` remain
+  build-unverified-or-worse for `ui-forest` overall (same gap carried since Phase 0 for the first
+  three; Phase 6 already flagged the latter two as needing hardware nobody has) -- Phase 8 doesn't
+  close any of these, since `WioTrackerL1` is still the only board anyone has actually flashed.
+- Phase 7 itself (this phase's own prerequisite) is still entirely unflashed by anyone -- seen above,
+  this phase's WioTrackerL1 regression pass is a paper trace of Phase 7's diff, not a confirmation
+  that Phase 7 works as intended on real hardware. Whoever next has `WioTrackerL1` on their desk should
+  flash the current `WioTrackerL1_companion_radio_forest_ble` build (Phases 0-7 combined) before
+  trusting any of Phase 7's "code complete" claims, same standing gap noted at the top of the Phase 7
+  section above.

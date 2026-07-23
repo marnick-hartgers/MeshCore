@@ -10,8 +10,11 @@ class UITask;   // avoid circular include with UITask.h, see Screen_SettingsDevi
 
 #define UI_SETTINGS_DEVICE_ITEM_COUNT 3
 
-// Buzzer, notifications entry-point stub, restore defaults
-// (phase-3-settings.md step 6). "Device name" is intentionally NOT
+// Buzzer, notifications entry point, restore defaults (phase-3-settings.md
+// step 6 / phase-7-notifications.md step 3). Phase 7 wires the "Notifications"
+// row (a Phase 3 stub that toasted a placeholder) to push the real
+// Screen_NotificationSettings, built and owned by UITask same as every other
+// sub-screen this class points at. "Device name" is intentionally NOT
 // duplicated here -- see Screen_SettingsAdvert.h's header comment: node_name
 // is the same single field either bullet point could refer to, and it's
 // implemented once, under Advert.
@@ -39,12 +42,11 @@ class Screen_SettingsDevice : public MenuScreen {
 
   static bool getBuzzer(void* ctx);
   static void setBuzzer(void* ctx, bool value);
-  static void showNotificationsStub(void* ctx);
 
   static void confirmRestoreDefaults(void* ctx);
   static void doRestoreDefaults(void* ctx);
 
 public:
   Screen_SettingsDevice(NavStack& nav, ToastOverlay& toast, ConfirmScreen& confirm, UITask* task,
-                        ToggleField& toggleField);
+                        ToggleField& toggleField, UIScreen* notificationSettings);
 };

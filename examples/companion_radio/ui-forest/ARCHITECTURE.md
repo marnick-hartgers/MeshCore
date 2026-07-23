@@ -1,9 +1,10 @@
 # ui-forest — as-built architecture
 
-Describes the code as it exists after Phase 6, not the aspirational design in `PLAN.md`.
-Where this file and `PLAN.md` disagree, this file wins for "what's actually there today" —
-`PROGRESS.md` explains why, when the difference was a deliberate call. Read this before
-starting Phase 4 so new screens plug into the existing shape instead of reinventing it.
+Describes the code as it exists after Phase 8 (the last phase in `PLAN.md`'s roadmap), not the
+aspirational design in `PLAN.md`. Where this file and `PLAN.md` disagree, this file wins for
+"what's actually there today" — `PROGRESS.md` explains why, when the difference was a deliberate
+call. Read this before touching any screen so new code plugs into the existing shape instead of
+reinventing it.
 
 ## Entry point contract
 
@@ -612,30 +613,107 @@ from whatever was showing, discarding any submenu context). Dismissing (`KEY_ENT
 until none remain) calls `nav.reset(_home)`, so it always lands back at Home root, never at
 whatever screen was showing before the interrupt -- again matching ui-new exactly.
 
+### `Screen_NotificationSettings` / `Screen_NotificationEventConfig` / `Screen_RecentEvents` (Phase 7)
+
+`AbstractUITask.h`'s `UIEventType` gained a sixth value, `advertSent` -- a user-initiated advert
+send, kept distinct from the generic `ack` confirmation tone (which is also fired for GPS/buzzer
+toggle confirmations, see `toggleGPS()`/`toggleBuzzer()` below) so it can be independently
+configured/logged. Every `notify()` implementation in `ui-new`/`ui-tiny`/`ui-orig` already ends its
+switch with a `default:` case (confirmed by grep before adding this), so the new value is a silent
+no-op there.
+
+**`NotificationPrefs.h`** -- a new standalone header: `NotificationTypeConfig{bool buzzer; bool
+vibration;}`, one per configurable event type (`contactMessage`/`channelMessage`/`ack`/
+`advertSent` -- phase-7-notifications.md's "at minimum" list), bundled into a `NotificationPrefs`
+struct `UITask` owns as `_notify_prefs`. Deliberately UI-local/non-persisted, not new `NodePrefs`
+fields -- same reasoning as Phase 3's vibration-persistence gap (see PROGRESS.md): `NodePrefs` is a
+hand-maintained, unversioned, fixed-byte-offset binary format with no length guard, and extending
+it without a compiler on PATH to verify the change is real structural surgery on existing users'
+saved prefs files. Resets to all-on every reboot as a result.
+
+**`Screen_NotificationEventConfig`** -- one reusable `MenuScreen` subclass, instantiated four times
+(as plain member objects of `Screen_NotificationSettings`, not `UITask`-owned pointers -- see below)
+-- a "Buzzer" `Toggle` row plus, only `#ifdef PIN_VIBRATION`, a "Vibration" `Toggle` row, both
+operating directly on the `NotificationTypeConfig&` reference this instance was built with. No
+`the_mesh.savePrefs()` call anywhere in this class (unlike every other `Toggle` row in this
+codebase) since there's no persisted field behind it. LED isn't a third row here -- `userLedHandler()`
+(Phase 1) is a generic `_msgcount`-driven heartbeat never routed through `notify()` or any per-event
+trigger point, so there's nothing per-event to gate.
+
+**`Screen_NotificationSettings`** -- root menu (`Screen_SettingsDevice`'s "Notifications" row, a
+Phase-3 toast stub, now pushes this instead), 4 `Submenu` rows (Message/Channel Message/Ack/Advert)
+into the four `Screen_NotificationEventConfig` instances it holds as direct members. This is a
+deliberate departure from the "every screen is a `UITask`-owned pointer `new`'d in `begin()`"
+pattern every other screen in this codebase follows: since `Screen_NotificationSettings` itself is
+`new`'d exactly once in `UITask::begin()` and never moved afterward, its member sub-objects get
+stable addresses for the process lifetime, which is all `NavStack::push()` needs -- and nothing
+outside this one menu ever needs to reference any of the four individually, so there was no reason
+to also give `UITask` four more pointer members for them.
+
+**`Screen_RecentEvents`** -- the user-facing notification history (PLAN.md item 35), rendering
+against a *second*, separately-fed `EventLog` instance (`UITask::_recent_events`), not a filtered
+view over Phase 4's diagnostic `_event_log`. Render/scroll logic is a near-duplicate of
+`Screen_EventLog` (same newest-first, age-prefixed, `Layout`-scrolled shape) -- kept as its own
+class/file (matching PLAN.md §4's explicit two-file listing) rather than parameterizing
+`Screen_EventLog` with a title, since the two remain conceptually separate screens for separate
+audiences even though the buffer class is shared, per PLAN.md §7's own note.
+
+**`UITask::notify()` restructured**: a new per-event-type gating switch (`buzzer_on`/`vibration_on`,
+read from `_notify_prefs`) runs before the existing tune-selection switch (which gained an
+`advertSent` case) and the existing `PIN_VIBRATION` trigger; only `contactMessage`/`channelMessage`/
+`ack`/`advertSent` are independently gated -- `roomMessage`/`newContactMessage`/`none` fall through
+every switch's `default:` case and keep their exact pre-Phase-7 behavior (unconditional, no
+distinguishable tune). A third switch feeds `Screen_RecentEvents` (via the new
+`logRecentEvent()` passthrough, mirroring `logEvent()`'s shape): `contactMessage`/`channelMessage`/
+`newContactMessage` (the last as a proxy for "last contact seen", same reasoning Phase 4 already
+used for its own diagnostic-log entry of the same name -- there's no real contact-discovery hook
+into `_ui`). `ack` is deliberately excluded from this feed despite phase-7-notifications.md's own
+checklist naming it, because every real call site of `notify(UIEventType::ack)` in this codebase is
+a generic UI-action confirmation tone (GPS/buzzer toggles, and pre-Phase-7 `Screen_Advert`), not a
+real mesh delivery ack -- logging it would fill Recent Events with toggle noise, the same reasoning
+Phase 4 used to exclude `ack` from the diagnostic event log. `advertSent` isn't logged from inside
+`notify()` either -- `Screen_Advert` calls `logRecentEvent()` itself, since it (not `notify()`)
+knows the `the_mesh.advert()` result.
+
+**`Screen_Advert`** changed its confirmation-tone call from unconditional `notify(UIEventType::ack)`
+(fired before knowing the send result) to `notify(UIEventType::advertSent)` fired only on success --
+see PROGRESS.md's Phase 7 "Decisions" for the reasoning and the resulting small behavior change
+(no tone on a failed send, though the failure toast is unchanged).
+
+**Home's Phase 7 addition:** a "Recent Events" `Submenu` entry, inserted right before "Diagnostics"
+-- `UI_FOREST_HOME_ITEM_COUNT` bumped 12 -> 13. Deliberately a distinct entry from the existing
+Phase 1 "Recent" (`Screen_Recents`, recently-heard adverts/nodes) rather than reusing that name or
+screen -- the two show unrelated content.
+
 ### `UITask`
 
 Owns one instance of every framework class above — including the four shared `FormField` editor
-instances (`_toggle_field`/`_stepper_field`/`_enum_field`/`_text_field`, Phase 3) and, as of Phase
-4, the single shared `EventLog` instance (`_event_log`) — plus every screen and the real Home
-`MenuItem[]` table (sized `UI_FOREST_HOME_ITEM_COUNT` = 12 as of Phase 4, the worst case with
-GPS+Sensors both present plus Contacts/Channels/Settings/Diagnostics; `_home_item_count` tracks
-how many slots are actually used on this board). Home's item order is Status, Recent, Radio,
-Bluetooth, Advert, Contacts, Channels, [GPS], [Sensors], Diagnostics, Settings, Shutdown.
+instances (`_toggle_field`/`_stepper_field`/`_enum_field`/`_text_field`, Phase 3), the single shared
+`EventLog` instance (`_event_log`, Phase 4), and, as of Phase 7, a second `EventLog`
+(`_recent_events`) plus `NotificationPrefs _notify_prefs` — plus every screen and the real Home
+`MenuItem[]` table (sized `UI_FOREST_HOME_ITEM_COUNT` = 13 as of Phase 7, the worst case with
+GPS+Sensors both present plus Contacts/Channels/Recent Events/Settings/Diagnostics;
+`_home_item_count` tracks how many slots are actually used on this board). Home's item order is
+Status, Recent, Radio, Bluetooth, Advert, Contacts, Channels, [GPS], [Sensors], Recent Events,
+Diagnostics, Settings, Shutdown.
 `begin()` constructs `_contact_detail` before `_contacts` (the latter's constructor takes a
-`Screen_ContactDetail*`), every other leaf screen, then the five `Screen_SettingsXxx` sub-screens
-before the root `Screen_Settings`, then the four `Screen_DiagXxx`/`Screen_EventLog` leaf screens
-before the root `Screen_Diagnostics` (same "leaf before container" ordering as Settings), fills
-the item table with `MenuItemKind::Submenu` entries pointing at all of them, then constructs
-`_home` (a `MenuScreen`), `_msg_preview`, and `_splash` in that order (each later one needs a
-pointer to something built earlier), and calls
+`Screen_ContactDetail*`), every other leaf screen (including, as of Phase 7, `_recent_events_screen`
+alongside the other top-level ones), then the five `Screen_SettingsXxx` sub-screens before the root
+`Screen_Settings` (Phase 7: `_notification_settings` constructed before `_settings_device`, which
+needs a pointer to it, same "leaf before container" ordering), then the four
+`Screen_DiagXxx`/`Screen_EventLog` leaf screens before the root `Screen_Diagnostics` (same ordering
+again), fills the item table with `MenuItemKind::Submenu` entries pointing at all of them, then
+constructs `_home` (a `MenuScreen`), `_msg_preview`, and `_splash` in that order (each later one
+needs a pointer to something built earlier), and calls
 `nav.reset(_splash)`. `loop()` is the render loop described above, now also driving
 `InputRouter`'s callback methods (`checkDisplayOn`/`handleLongPress`/`handleDoubleClick`/
 `handleTripleClick`), `userLedHandler()`, buzzer/vibration `loop()`, auto-off, and the
 `AUTO_SHUTDOWN_MILLIVOLTS` low-battery shutdown check -- all ported from `ui-new`'s `loop()`
 tail. `msgRead`/`newMsg`/`notify` (the `AbstractUITask` virtuals `MyMesh` calls) now have real
-behavior: `notify()` plays buzzer tones/triggers vibration per `UIEventType` and (Phase 4) feeds
-the event log for message/channel/room/new-contact events, `newMsg()` pushes `Screen_MsgPreview`,
-`msgRead(0)` returns to Home.
+behavior: `notify()` gates buzzer tones/vibration per event type against `_notify_prefs` (Phase 7),
+plays the tune/triggers vibration, feeds the Phase 4 diagnostic event log for message/channel/room/
+new-contact events, feeds the Phase 7 Recent Events buffer for the subset of those that also
+buzz/vibrate, `newMsg()` pushes `Screen_MsgPreview`, `msgRead(0)` returns to Home.
 
 ## Board configuration surface
 
@@ -653,7 +731,7 @@ Every per-board knob ui-forest reacts to is a compile-time macro set in that boa
 | `DISPLAY_CLASS` | concrete `DisplayDriver` subclass for this board | `main.cpp` (constructs `disp`, passed into `UITask::begin()`) |
 | `PIN_BUZZER` | buzzer present | `UITask` (tones via `notify()`, mute toggle, `StatusBar`'s muted icon) |
 | `PIN_VIBRATION` | vibration motor present | `UITask` (`notify()` triggers it) |
-| `PIN_STATUS_LED` | status LED pin | `UITask::userLedHandler()` (compiled, not hardware-verified -- no Phase 1 pilot has it) |
+| `PIN_STATUS_LED` | status LED pin | `UITask::userLedHandler()` (compiled -- `ThinkNode_M1`, Phase 8, is the first board defining this macro; still not hardware-verified, nobody has flashed that board) |
 | `ENV_INCLUDE_GPS` | board has a GPS module | `UITask` (gates constructing/wiring `Screen_Gps`; `heltec_rc32`'s forest env sets this) |
 | `UI_SENSORS_PAGE` | board wants the CayenneLPP sensor-scroll screen | `UITask` (gates constructing/wiring `Screen_Sensors`; `WioTrackerL1`'s forest env sets this) |
 | `AUTO_OFF_MILLIS` | display auto-off delay (default 15000, `0` disables) | `UITask::loop()` |
@@ -671,10 +749,11 @@ Each pilot board gets one new `_companion_radio_forest_ble`/`_forest_usb` env in
 `variants/<board>/platformio.ini`, `extends`-ing the board's base section (not the existing
 `_ble`/`_usb` env) and restating `build_flags`/`build_src_filter`/`lib_deps` from scratch with
 two lines changed: the `-I` path and the `ui-*/*.cpp` glob. Existing `_ble`/`_usb`/`_wifi` envs
-for every board are untouched. See any of the six `variants/*/platformio.ini` files' forest env
+for every board are untouched. See any of the eight `variants/*/platformio.ini` files' forest env
 for the exact template (`sensecap_indicator-espnow`'s is named `_comp_radio_forest_usb`, not
 `_companion_radio_forest_usb` — matches that board's existing, already-shortened `_comp_radio_usb`
-env, see PROGRESS.md's Phase 6 section); `PROGRESS.md` lists which six boards have one today.
+env, see PROGRESS.md's Phase 6 section); `PROGRESS.md` lists which eight boards have one today
+(Phase 8 added the eighth, `ThinkNode_M1`).
 
 ## Phase 5 additions (visual polish)
 
@@ -898,7 +977,7 @@ env, see PROGRESS.md's Phase 6 section); `PROGRESS.md` lists which six boards ha
 - The status bar's transport label change (`"BLE:%s"` -> `UI_FOREST_TRANSPORT_NAME ":%s"`) is a
   no-op in practice today -- every existing forest env is BLE -- so it hasn't actually been
   exercised against a non-BLE build.
-- `phases/phase-4-diagnostics.md`'s stated prerequisite ("Phase 3 added a Diagnostics `Submenu`
+- `phases/completed/phase-4-diagnostics.md`'s stated prerequisite ("Phase 3 added a Diagnostics `Submenu`
   placeholder to Home") did **not** hold -- `phase-3-settings.md`'s own "What to build" list never
   asked for one. Resolved by building the Home entry and its real content in this phase in one
   step, rather than the originally-planned placeholder-then-content across two phases -- see
@@ -935,3 +1014,28 @@ env, see PROGRESS.md's Phase 6 section); `PROGRESS.md` lists which six boards ha
   `sensecap_indicator-espnow`'s forest env also reports the wrong transport name ("USB" instead
   of "ESPNOW") via a pre-existing `Transport.h` gap this phase surfaced but deliberately didn't
   fix (out of scope, cosmetic-only).
+- **Phase 7 is entirely build-unverified and unflashed** (same no-`pio`/no-`g++` limitation as every
+  prior phase, but unlike most of them, no informal `WioTrackerL1` pass has happened yet either) --
+  see PROGRESS.md's Phase 7 section for the full account. Per-event-type notification config
+  (`NotificationPrefs`) is UI-local/non-persisted and resets to all-on every reboot, same shape as
+  the still-open Phase 3 vibration-persistence gap. `ack` events are deliberately not fed into
+  `Screen_RecentEvents` despite phase-7-notifications.md's own checklist naming them, since every
+  real `notify(UIEventType::ack)` call site in this codebase is a generic UI-action confirmation
+  tone, not a real mesh delivery ack (see PROGRESS.md's Phase 7 "Decisions"). A pre-existing (not
+  Phase-7-introduced) `MenuScreen`/`_has_icons` construction-order concern was also noticed while
+  tracing this phase's code -- flagged in PROGRESS.md but not fixed, since it spans every
+  `MenuScreen` subclass back through Phase 5, not just this phase's additions.
+- **Phase 8 widened board coverage by one (`ThinkNode_M1`, a `GxEPDDisplay` e-ink board), entirely
+  build-unverified** (no hardware for this board, no `pio`/`g++` in this dev environment) -- see
+  PROGRESS.md's Phase 8 section for the full account, including a hand-traced regression pass of
+  Phase 7's diff against `WioTrackerL1`'s specific macro set (found nothing that looks like a
+  regression, but is a paper trace, not a reflash). **This repo has exactly one LGFX/LovyanGFX
+  RGB-panel board (`sensecap_indicator-espnow`, Phase 6's pilot) and no second one to widen coverage
+  to** -- confirmed by grep (`helpers/ui/LGFXDisplay.cpp` usage, `public LGFXDisplay`/`LGFX_Device`/
+  `lgfx::` references, and a full listing of `src/helpers/ui/`), not assumed; this is a real gap in
+  available board variants, not a skipped task. `ThinkNode_M1` is the first `ui-forest` board across
+  all 8 phases to define `PIN_STATUS_LED` -- `UITask::userLedHandler()`'s active-low polarity handling
+  was traced against it and found correct, but still nobody has seen the LED actually blink. The
+  migration/deprecation decision for `ui-forest` (which boards, if any, get it as their default,
+  and on what timeline) is deliberately NOT decided here -- see `MIGRATION-DECISION.md` (same
+  directory), which lays out the tradeoffs and asks the user rather than recommending one unilaterally.

@@ -19,7 +19,13 @@ enum class UIEventType {
     channelMessage,
     roomMessage,
     newContactMessage,
-    ack
+    ack,
+    advertSent   // ui-forest Phase 7: user-initiated advert send, distinct from
+                 // the generic "ack" confirmation tone (also fired for
+                 // GPS/buzzer toggle confirmations) so it can be independently
+                 // configured/logged. Every existing notify() switch in
+                 // ui-new/ui-tiny/ui-orig already has a `default:` case, so
+                 // this is safe to add without touching them.
 };
 
 class AbstractUITask {

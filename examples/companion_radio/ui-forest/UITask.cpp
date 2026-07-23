@@ -56,13 +56,18 @@ void UITask::begin(DisplayDriver* display, SensorManager* sensors, NodePrefs* no
   _contact_detail = new Screen_ContactDetail(_nav);
   _contacts = new Screen_Contacts(_nav, _contact_detail);
   _channels = new Screen_Channels(_nav);
+  // Phase 7: the user-facing notification history -- a top-level Home entry,
+  // constructed alongside the other top-level leaf screens above.
+  _recent_events_screen = new Screen_RecentEvents(_nav, _recent_events);
   // Phase 3: sub-screens constructed before the root Screen_Settings, which
   // needs pointers to all five (same "leaf screens first" ordering _home
-  // itself already follows).
+  // itself already follows). Phase 7: _notification_settings constructed
+  // before _settings_device, which needs a pointer to it (same ordering).
   _settings_radio = new Screen_SettingsRadio(_nav, _toast, _confirm, node_prefs, _stepper_field, _enum_field, _event_log);
   _settings_advert = new Screen_SettingsAdvert(_nav, _toast, _confirm, node_prefs, _text_field, _toggle_field);
   _settings_network = new Screen_SettingsNetwork(_nav, _toast, _confirm, node_prefs, _toggle_field, _enum_field, _stepper_field);
-  _settings_device = new Screen_SettingsDevice(_nav, _toast, _confirm, this, _toggle_field);
+  _notification_settings = new Screen_NotificationSettings(_nav, _toast, _toggle_field, _notify_prefs);
+  _settings_device = new Screen_SettingsDevice(_nav, _toast, _confirm, this, _toggle_field, _notification_settings);
   _settings_danger = new Screen_SettingsDanger(_nav, _toast, _confirm, this);
   _settings = new Screen_Settings(_nav, _toast, _settings_radio, _settings_advert, _settings_network, _settings_device, _settings_danger);
   // Phase 4: sub-screens before the root Screen_Diagnostics, same "leaf
@@ -157,6 +162,14 @@ void UITask::begin(DisplayDriver* display, SensorManager* sensors, NodePrefs* no
   i++;
 #endif
 
+  _home_items[i].label = "Recent Events";
+  _home_items[i].icon = NULL;
+  _home_items[i].kind = MenuItemKind::Submenu;
+  _home_items[i].action = NULL;
+  _home_items[i].action_ctx = NULL;
+  _home_items[i].submenu = _recent_events_screen;
+  i++;
+
   _home_items[i].label = "Diagnostics";
   _home_items[i].icon = NULL;
   _home_items[i].kind = MenuItemKind::Submenu;
@@ -216,16 +229,29 @@ void UITask::newMsg(uint8_t path_len, const char* from_name, const char* text, i
 }
 
 void UITask::notify(UIEventType t) {
-#if defined(PIN_BUZZER)
+  // Phase 7: per-event-type buzzer/vibration gating (NotificationPrefs.h) --
+  // only the four event types phase-7-notifications.md names as the minimum
+  // are independently configurable; roomMessage/newContactMessage/none fall
+  // through the default case below and stay unconditionally on, unchanged
+  // from pre-Phase-7 behavior (neither has a distinct buzzer tune today
+  // either, see the tune switch further down).
+  bool buzzer_on = true, vibration_on = true;
   switch (t) {
     case UIEventType::contactMessage:
-      buzzer.play("MsgRcv3:d=4,o=6,b=200:32e,32g,32b,16c7");
+      buzzer_on = _notify_prefs.contactMessage.buzzer;
+      vibration_on = _notify_prefs.contactMessage.vibration;
       break;
     case UIEventType::channelMessage:
-      buzzer.play("kerplop:d=16,o=6,b=120:32g#,32c#");
+      buzzer_on = _notify_prefs.channelMessage.buzzer;
+      vibration_on = _notify_prefs.channelMessage.vibration;
       break;
     case UIEventType::ack:
-      buzzer.play("ack:d=32,o=8,b=120:c");
+      buzzer_on = _notify_prefs.ack.buzzer;
+      vibration_on = _notify_prefs.ack.vibration;
+      break;
+    case UIEventType::advertSent:
+      buzzer_on = _notify_prefs.advertSent.buzzer;
+      vibration_on = _notify_prefs.advertSent.vibration;
       break;
     case UIEventType::roomMessage:
     case UIEventType::newContactMessage:
@@ -233,10 +259,33 @@ void UITask::notify(UIEventType t) {
     default:
       break;
   }
+
+#if defined(PIN_BUZZER)
+  if (buzzer_on) {
+    switch (t) {
+      case UIEventType::contactMessage:
+        buzzer.play("MsgRcv3:d=4,o=6,b=200:32e,32g,32b,16c7");
+        break;
+      case UIEventType::channelMessage:
+        buzzer.play("kerplop:d=16,o=6,b=120:32g#,32c#");
+        break;
+      case UIEventType::ack:
+        buzzer.play("ack:d=32,o=8,b=120:c");
+        break;
+      case UIEventType::advertSent:
+        buzzer.play("advert:d=8,o=6,b=160:c,e,g");
+        break;
+      case UIEventType::roomMessage:
+      case UIEventType::newContactMessage:
+      case UIEventType::none:
+      default:
+        break;
+    }
+  }
 #endif
 
 #ifdef PIN_VIBRATION
-  if (t != UIEventType::none) {
+  if (t != UIEventType::none && vibration_on) {
     vibration.trigger();
   }
 #endif
@@ -264,6 +313,46 @@ void UITask::notify(UIEventType t) {
       // toggleGPS()/toggleBuzzer() below), not just message acks -- too noisy
       // and not mesh-diagnostic in nature to log every occurrence.
       break;
+    case UIEventType::advertSent:
+      // Screen_Advert already calls logEvent("Advert sent"/"Advert failed")
+      // itself, since it (and not notify()) knows the the_mesh.advert()
+      // result -- no duplicate entry here.
+      break;
+    case UIEventType::none:
+    default:
+      break;
+  }
+
+  // Phase 7: user-facing Recent Events feed (Screen_RecentEvents) --
+  // deliberately the subset of the above that also buzzes/vibrates, i.e.
+  // phase-7-notifications.md's own framing of "what a non-technical user
+  // would want a history of". Ack is excluded even though it also
+  // buzzes/vibrates: it's overloaded with generic UI-action confirmation
+  // tones (GPS/buzzer toggles, see toggleGPS()/toggleBuzzer() below), not just
+  // message acks, so logging it here would fill this history with toggle
+  // noise -- the same reasoning Phase 4 already used to exclude it from the
+  // diagnostic event log above.
+  switch (t) {
+    case UIEventType::contactMessage:
+      logRecentEvent("Message received");
+      break;
+    case UIEventType::channelMessage:
+      logRecentEvent("Channel message received");
+      break;
+    case UIEventType::newContactMessage:
+      // Closest already-wired proxy for "last contact seen" -- there is no
+      // real contact-discovery hook into _ui (MyMesh::onDiscoveredContact
+      // only writes to _serial, confirmed by reading it, same finding Phase 4
+      // already made for its own event log); adding one would be exactly the
+      // new Mesh/MyMesh callback plumbing phase-7-notifications.md's own
+      // "Data / API dependencies" section says not to add.
+      logRecentEvent("New contact");
+      break;
+    case UIEventType::roomMessage:
+    case UIEventType::ack:
+    case UIEventType::advertSent:
+      // advertSent: Screen_Advert calls logRecentEvent("Advert sent") itself,
+      // same reasoning as the diagnostic-log case above.
     case UIEventType::none:
     default:
       break;

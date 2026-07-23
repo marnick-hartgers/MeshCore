@@ -29,6 +29,7 @@
 #include "ConfirmScreen.h"
 #include "FormField.h"
 #include "EventLog.h"
+#include "NotificationPrefs.h"
 #include "Transport.h"
 #include "Screen_Splash.h"
 #include "Screen_Status.h"
@@ -45,11 +46,13 @@
 #include "Screen_SettingsNetwork.h"
 #include "Screen_SettingsDevice.h"
 #include "Screen_SettingsDanger.h"
+#include "Screen_NotificationSettings.h"
 #include "Screen_Diagnostics.h"
 #include "Screen_DiagRadio.h"
 #include "Screen_DiagPackets.h"
 #include "Screen_DiagCore.h"
 #include "Screen_EventLog.h"
+#include "Screen_RecentEvents.h"
 #if ENV_INCLUDE_GPS == 1
   #include "Screen_Gps.h"
 #endif
@@ -66,15 +69,19 @@
 // Phase 4 for "Diagnostics" -- phase-4-diagnostics.md's own stated
 // prerequisite (that Phase 3 already added this slot as a placeholder) didn't
 // hold (see PROGRESS.md/ARCHITECTURE.md), so this phase adds the Home entry
-// and its real content in one step instead of two.
-#define UI_FOREST_HOME_ITEM_COUNT 12
+// and its real content in one step instead of two. Bumped to 13 in Phase 7 for
+// "Recent Events" -- deliberately a distinct Home entry from the existing
+// "Recent" (Screen_Recents, Phase 1: recently-heard adverts/nodes) rather than
+// reusing that name, since the two screens show unrelated content (mesh nodes
+// heard vs. this phase's user-facing notification history).
+#define UI_FOREST_HOME_ITEM_COUNT 13
 
 // Entry point -- same public contract main.cpp already expects from
 // ui-new/ui-tiny (construct with board+serial, begin(display, sensors,
 // node_prefs), loop()). Phase 1 brought ui-forest to parity with ui-new's
 // feature set; Phase 2 restructures Home into a real top-level menu and adds
 // Contacts/Channels browsing (PLAN.md Phase 2 /
-// phases/phase-2-navigation-and-data-browsing.md).
+// phases/completed/phase-2-navigation-and-data-browsing.md).
 class UITask : public AbstractUITask {
   DisplayDriver* _display;
   SensorManager* _sensors;
@@ -108,6 +115,19 @@ class UITask : public AbstractUITask {
   // through a reference" shape as _toast/_status_bar.
   EventLog _event_log;
 
+  // Phase 7: a second, separately-fed EventLog instance -- the user-facing
+  // notification history (Screen_RecentEvents), distinct from the debug
+  // _event_log above (Screen_EventLog). See NotificationPrefs.h and
+  // UITask::notify() for what feeds each one.
+  EventLog _recent_events;
+
+  // Phase 7: per-event-type buzzer/vibration config (NotificationPrefs.h),
+  // read by UITask::notify() and read/written by Screen_NotificationSettings'
+  // four Screen_NotificationEventConfig sub-screens (via reference, same
+  // "UITask owns it, screens read/write through a reference" shape as
+  // _event_log above). UI-local/non-persisted -- see NotificationPrefs.h.
+  NotificationPrefs _notify_prefs;
+
   Screen_Splash* _splash;
   MenuScreen* _home;
   Screen_Status* _status;
@@ -123,12 +143,14 @@ class UITask : public AbstractUITask {
   Screen_SettingsNetwork* _settings_network;
   Screen_SettingsDevice* _settings_device;
   Screen_SettingsDanger* _settings_danger;
+  Screen_NotificationSettings* _notification_settings;
   Screen_Settings* _settings;
   Screen_DiagRadio* _diag_radio;
   Screen_DiagPackets* _diag_packets;
   Screen_DiagCore* _diag_core;
   Screen_EventLog* _event_log_screen;
   Screen_Diagnostics* _diagnostics;
+  Screen_RecentEvents* _recent_events_screen;
 #if ENV_INCLUDE_GPS == 1
   Screen_Gps* _gps;
 #endif
@@ -162,9 +184,9 @@ public:
       _bluetooth(NULL), _advert(NULL),
       _contact_detail(NULL), _contacts(NULL), _channels(NULL),
       _settings_radio(NULL), _settings_advert(NULL), _settings_network(NULL),
-      _settings_device(NULL), _settings_danger(NULL), _settings(NULL),
+      _settings_device(NULL), _settings_danger(NULL), _notification_settings(NULL), _settings(NULL),
       _diag_radio(NULL), _diag_packets(NULL), _diag_core(NULL),
-      _event_log_screen(NULL), _diagnostics(NULL),
+      _event_log_screen(NULL), _diagnostics(NULL), _recent_events_screen(NULL),
 #if ENV_INCLUDE_GPS == 1
       _gps(NULL),
 #endif
@@ -204,6 +226,13 @@ public:
   // `_event_log` (see begin()), so it reads the buffer without going through
   // UITask at all.
   void logEvent(const char* text) { _event_log.push(text); }
+
+  // Phase 7: the one place any screen/UITask code appends to the user-facing
+  // Recent Events buffer (distinct from logEvent() above) -- see
+  // UITask::notify() and Screen_Advert for the feed points, and
+  // NotificationPrefs.h/Screen_RecentEvents for why this is a second buffer
+  // rather than a filtered view over _event_log.
+  void logRecentEvent(const char* text) { _recent_events.push(text); }
 
   void toggleBuzzer();
   bool getGPSState();
