@@ -36,14 +36,36 @@ Add new forest envs for both, following the base-section-extends pattern from Ph
    fixed string). This is what makes it possible for touch/keyboard boards to show *their own*
    correct hints instead of button-press language that doesn't apply to them.
 2. **Touch wiring for `sensecap_indicator-espnow`** (item 33) — in `InputRouter`, add a touch
-   path using `LGFXDisplay::getTouch(x,y)`. Map tap → `KEY_ENTER`, swipe (direction inferred
+   path that reads touch coordinates and maps tap → `KEY_ENTER`, swipe (direction inferred
    from touch-start/touch-end delta) → `KEY_NEXT`/`KEY_PREV` (or LEFT/RIGHT, matching whatever
    `MenuScreen` already expects for list navigation). This board currently "just runs `ui-new`
    on a plain button" (PLAN.md §2) — the forest env should let it tap a menu item directly
-   instead of relying on the single fallback button. Since `getTouch()` exists at the driver
-   level but has zero prior callers, budget time to verify its actual coordinate semantics
-   (screen-space vs. panel-native orientation) against this board's `-D UI_ZOOM=3.5` and
-   rotation setup before wiring gesture thresholds.
+   instead of relying on the single fallback button.
+
+   **Correction (checked against the repo before starting):** `getTouch(int*, int*)`
+   (`src/helpers/ui/LGFXDisplay.h:38`) is declared only on `LGFXDisplay` itself, not on the
+   shared `DisplayDriver` base class — and `InputRouter`/`UITask` only ever hold a
+   `DisplayDriver*`, so `LGFXDisplay::getTouch(x,y)` isn't callable as the doc originally
+   implied without a cast. Two ways to close that gap, pick whichever fits the existing style
+   better once you're in the code:
+   - Add a virtual `getTouch(int*, int*)` to `DisplayDriver` (default no-op/`return false`),
+     matching the exact pattern `isEink()`/`supportsColor()` already use
+     (`DisplayDriver.h:17,23`) — `InputRouter` then calls it generically through the
+     `DisplayDriver*` it already has, no cast, no new accessor.
+   - Or expose a raw display pointer/accessor from `UITask` and `static_cast<LGFXDisplay*>`
+     inside a `#ifdef HAS_TOUCH`-gated block at the call site.
+
+   Leaning towards the virtual-method route since it's the established convention for
+   optional per-backend capability queries, but it's an implementation call, not a fixed
+   requirement.
+
+   Since `getTouch()` exists at the driver level but has zero prior callers, also budget time
+   to verify its actual coordinate semantics (screen-space vs. panel-native orientation)
+   against this board's `-D UI_ZOOM=3.5` and rotation setup before wiring gesture thresholds.
+   Note too that `HAS_TOUCH` (confirmed real, `variants/sensecap_indicator-espnow/
+   platformio.ini:24`, alongside `-D UI_ZOOM=3.5` at line 20) isn't referenced anywhere in
+   `InputRouter.cpp` or `DisplayDriver` today — there's no existing gating convention to
+   follow for it; this phase establishes one fresh.
 3. **Keyboard + trackball wiring for `lilygo_tdeck`** (item 34):
    - Keyboard: feed character input into `FormField`'s `Text` editor as a second, richer input
      path — typing a name directly instead of incrementing through characters one at a time.

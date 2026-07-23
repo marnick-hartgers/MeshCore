@@ -181,6 +181,14 @@ public:
   bool hasDisplay() const { return _display != NULL; }
   bool isDisplayOn() const { return _display != NULL && _display->isOn(); }
 
+  // Phase 6 (item 33): InputRouter's only way to reach the touch-capable
+  // DisplayDriver -- _display is private to UITask, so this mirrors the
+  // existing isDisplayOn()-style thin accessor rather than exposing _display
+  // itself. Backends with no touch hardware return false via
+  // DisplayDriver::getTouch()'s own default, so this is safe to call
+  // unconditionally even when HAS_TOUCH isn't defined for this board.
+  bool getTouch(int* x, int* y) const { return _display != NULL && _display->getTouch(x, y); }
+
   bool isBuzzerQuiet() {
 #ifdef PIN_BUZZER
     return buzzer.isQuiet();

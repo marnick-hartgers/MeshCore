@@ -1,13 +1,9 @@
 #include "Screen_Bluetooth.h"
 #include "UITask.h"
 #include "Layout.h"
+#include "InputRouter.h"
 #include "icons.h"
-
-#if UI_HAS_JOYSTICK
-  #define PRESS_LABEL "press Enter"
-#else
-  #define PRESS_LABEL "long press"
-#endif
+#include <stdio.h>
 
 int Screen_Bluetooth::render(DisplayDriver& display) {
   int top = Layout::statusBarHeight(true);
@@ -22,9 +18,13 @@ int Screen_Bluetooth::render(DisplayDriver& display) {
   display.drawXbm((display.width() - 32) / 2, top + 4,
       enabled ? bluetooth_on : bluetooth_off,
       32, 32);
+  // Phase 6 (item 32): built from InputRouter's per-board gesture vocabulary
+  // instead of the ui-new-ported, compile-time-only PRESS_LABEL macro.
+  char hint[40];
+  snprintf(hint, sizeof(hint), "toggle: %s", InputRouter::activateHint());
   display.setTextSize(1);
   display.setColor(DisplayDriver::LIGHT);
-  display.drawTextCentered(display.width() / 2, display.height() - Layout::rowHeight(), "toggle: " PRESS_LABEL);
+  display.drawTextCentered(display.width() / 2, display.height() - Layout::rowHeight(), hint);
 
   return 1000;
 }

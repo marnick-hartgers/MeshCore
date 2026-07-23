@@ -1,13 +1,9 @@
 #include "Screen_Shutdown.h"
 #include "UITask.h"
 #include "Layout.h"
+#include "InputRouter.h"
 #include "icons.h"
-
-#if UI_HAS_JOYSTICK
-  #define PRESS_LABEL "press Enter"
-#else
-  #define PRESS_LABEL "long press"
-#endif
+#include <stdio.h>
 
 #ifndef SHUTDOWN_CONFIRM_MILLIS
   #define SHUTDOWN_CONFIRM_MILLIS 3000
@@ -20,10 +16,14 @@ static void shutdownAction(void* ctx) {
 int Screen_Shutdown::render(DisplayDriver& display) {
   int top = Layout::statusBarHeight(true);
 
+  // Phase 6 (item 32): built from InputRouter's per-board gesture vocabulary
+  // instead of the ui-new-ported, compile-time-only PRESS_LABEL macro.
+  char hint[40];
+  snprintf(hint, sizeof(hint), "hibernate: %s", InputRouter::activateHint());
   display.setColor(DisplayDriver::GREEN);
   display.setTextSize(1);
   display.drawXbm((display.width() - 32) / 2, top + 4, power_icon, 32, 32);
-  display.drawTextCentered(display.width() / 2, display.height() - Layout::rowHeight(), "hibernate: " PRESS_LABEL);
+  display.drawTextCentered(display.width() / 2, display.height() - Layout::rowHeight(), hint);
 
   return 1000;
 }

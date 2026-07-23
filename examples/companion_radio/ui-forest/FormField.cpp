@@ -1,5 +1,6 @@
 #include "FormField.h"
 #include "Layout.h"
+#include "InputRouter.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -21,9 +22,15 @@ int ToggleField::render(DisplayDriver& display) {
   display.setColor(Layout::accentColor(display, value ? DisplayDriver::GREEN : DisplayDriver::RED));
   display.drawTextCentered(display.width() / 2, top + 20, value ? "ON" : "OFF");
 
+  // Phase 6 (item 32): built from the active board's real gesture vocabulary
+  // (InputRouter::activateHint()) instead of a hardcoded "ENTER: toggle" --
+  // "long press"/"tap"/"click" etc, matching whatever gesture actually
+  // performs KEY_ENTER on this board.
+  char hint[40];
+  snprintf(hint, sizeof(hint), "%s: toggle", InputRouter::activateHint());
   display.setTextSize(1);
   display.setColor(DisplayDriver::LIGHT);
-  display.drawTextCentered(display.width() / 2, display.height() - Layout::rowHeight(), "ENTER: toggle");
+  display.drawTextCentered(display.width() / 2, display.height() - Layout::rowHeight(), hint);
 
   return 400;
 }
@@ -86,9 +93,14 @@ int StepperField::render(DisplayDriver& display) {
   display.setColor(DisplayDriver::YELLOW);
   display.drawTextCentered(display.width() / 2, top + 20, buf);
 
+  // Phase 6 (item 32): "< adjust" doesn't make sense on a touch/rotary/
+  // trackball board -- built from InputRouter::moveHint()/activateHint()
+  // instead of the literal button-press wording.
+  char hint[40];
+  snprintf(hint, sizeof(hint), "%s: adjust, %s: save", InputRouter::moveHint(), InputRouter::activateHint());
   display.setTextSize(1);
   display.setColor(DisplayDriver::LIGHT);
-  display.drawTextCentered(display.width() / 2, display.height() - Layout::rowHeight(), "< adjust  ENTER: save");
+  display.drawTextCentered(display.width() / 2, display.height() - Layout::rowHeight(), hint);
 
   return 200;
 }
@@ -238,9 +250,16 @@ int TextField::render(DisplayDriver& display) {
   display.setColor(DisplayDriver::RED);
   display.fillRect(caret_x, y + 18, caret_w, 2);
 
+  // Phase 6 (item 32/34): on lilygo_tdeck this now advertises the real
+  // keyboard path alongside the still-working increment picker (see
+  // InputRouter::textEntryHint()); every other board keeps the original
+  // "PREV: next char, ENTER: save" wording, just built from activateHint()
+  // instead of a literal "ENTER".
+  char hint[48];
+  InputRouter::textEntryHint(hint, sizeof(hint));
   display.setTextSize(1);
   display.setColor(DisplayDriver::LIGHT);
-  display.drawTextCentered(display.width() / 2, display.height() - Layout::rowHeight(), "PREV: next char, ENTER: save");
+  display.drawTextCentered(display.width() / 2, display.height() - Layout::rowHeight(), hint);
 
   return 300;
 }
@@ -273,6 +292,40 @@ bool TextField::handleInput(char c) {
     _buf[_len] = 0;
     if (_set) _set(_ctx, _buf);
     _nav.pop();
+    return true;
+  }
+  // Phase 6 (item 34): second, richer input path for lilygo_tdeck's real
+  // keyboard -- InputRouter feeds typed characters straight through as a
+  // plain byte (see InputRouter.cpp's LILYGO_TDECK block), so this is simply
+  // unreached on every board without one. Backspace (8) and Delete (127) both
+  // erase; anything else printable is typed at the cursor and the cursor
+  // advances, matching how a real keyboard is expected to behave -- unlike
+  // the increment-picker gestures above, which deliberately overwrite in
+  // place and require a separate PREV press to move.
+  if (c == 8 || c == 127) {
+    if (_cursor > 0) {
+      _cursor--;
+      if (_cursor == _len - 1) {
+        _len--;             // erasing the last character -- actually shrink the string
+        _buf[_len] = 0;
+      } else {
+        _buf[_cursor] = ' ';  // interior erase: blank in place, same overwrite model as the picker above
+      }
+    }
+    return true;
+  }
+  if (c >= 32 && c < 127) {
+    _buf[_cursor] = (char)c;
+    if (_cursor == _len && _len < _max_len) {
+      _len++;
+      _buf[_len] = 0;
+    }
+    // Cap at _len-1 (not _len) once the buffer is full -- with no append slot
+    // left, _len itself is one past the last real character and isn't a
+    // valid cursor position (matches the invariant KEY_PREV's cursor-advance
+    // above already relies on: num_positions == _len, not _len+1, once full).
+    int max_cursor = (_len < _max_len) ? _len : _len - 1;
+    if (_cursor < max_cursor) _cursor++;
     return true;
   }
   return false;

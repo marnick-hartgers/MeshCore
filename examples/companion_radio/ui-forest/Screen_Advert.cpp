@@ -2,20 +2,20 @@
 #include "UITask.h"
 #include "../MyMesh.h"
 #include "Layout.h"
+#include "InputRouter.h"
 #include "icons.h"
-
-#if UI_HAS_JOYSTICK
-  #define PRESS_LABEL "press Enter"
-#else
-  #define PRESS_LABEL "long press"
-#endif
+#include <stdio.h>
 
 int Screen_Advert::render(DisplayDriver& display) {
   int top = Layout::statusBarHeight(true);
 
+  // Phase 6 (item 32): built from InputRouter's per-board gesture vocabulary
+  // instead of the ui-new-ported, compile-time-only PRESS_LABEL macro.
+  char hint[40];
+  snprintf(hint, sizeof(hint), "advert: %s", InputRouter::activateHint());
   display.setColor(DisplayDriver::GREEN);
   display.drawXbm((display.width() - 32) / 2, top + 4, advert_icon, 32, 32);
-  display.drawTextCentered(display.width() / 2, display.height() - Layout::rowHeight(), "advert: " PRESS_LABEL);
+  display.drawTextCentered(display.width() / 2, display.height() - Layout::rowHeight(), hint);
 
   return 1000;
 }

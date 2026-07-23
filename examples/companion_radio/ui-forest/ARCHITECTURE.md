@@ -1,6 +1,6 @@
 # ui-forest — as-built architecture
 
-Describes the code as it exists after Phase 5, not the aspirational design in `PLAN.md`.
+Describes the code as it exists after Phase 6, not the aspirational design in `PLAN.md`.
 Where this file and `PLAN.md` disagree, this file wins for "what's actually there today" —
 `PROGRESS.md` explains why, when the difference was a deliberate call. Read this before
 starting Phase 4 so new screens plug into the existing shape instead of reinventing it.
@@ -199,6 +199,42 @@ pattern), and declare them `extern` in `target.h`. `InputRouter` picks them up a
 via the `#if defined(JOYSTICK_UP) && defined(JOYSTICK_DOWN)` guard — no ui-forest changes
 needed.
 
+**Phase 6 additions: touch (`sensecap_indicator-espnow`) and keyboard+trackball
+(`lilygo_tdeck`).** Both follow the same "extra input source, only consulted if nothing higher-
+priority already produced a key this poll" precedence the rotary/analog/torch blocks already
+established — see PROGRESS.md's Phase 6 section for the confidence levels behind each (touch is
+verified-by-reading-code; the T-Deck pin/protocol assumptions are not verified against any
+schematic in this repo):
+
+- `#if defined(HAS_TOUCH)` — polls `task.getTouch(&x, &y)` (a thin passthrough to the
+  `DisplayDriver*` `UITask` already holds, via the new `DisplayDriver::getTouch()` virtual —
+  default `false`, overridden in `LGFXDisplay`) every poll() regardless of whether a button
+  already won this frame, since a tap's touch-down and touch-up can both land between two
+  polls otherwise. Tracks touch-down/last-point/touch-up as `InputRouter` instance state
+  (`_touch_active`/`_touch_start_*`/`_touch_last_*`); on touch-up, classifies the total
+  start-to-end delta as a tap (`KEY_ENTER`, both axes under `TOUCH_SWIPE_THRESHOLD`=12px) or a
+  swipe on whichever axis moved more (right/up = `KEY_NEXT`, left/down = `KEY_PREV`). Purely
+  additive on top of this board's existing `PIN_USER_BTN=38` fallback button.
+- `#if defined(LILYGO_TDECK)` — polls four `MomentaryButton`s (`trackball_up/down/left/right`,
+  declared in `target.h`/`.cpp`, multiclick disabled so each trackball pulse becomes one key
+  immediately) for `KEY_UP/DOWN/LEFT/RIGHT`, then polls `tdeck_keyboard.poll()` (throttled to
+  20ms, same shape as `PIN_USER_BTN_ANA`'s ADC throttling) and returns whatever raw ASCII byte
+  it reports, unchanged, as the "key" code. See "`FormField` (Toggle/Stepper/Enum/Text
+  editors)" below for how `TextField` is the only screen that interprets that raw byte.
+
+**Dynamic control hints (item 32).** `InputRouter` also exposes three static, stateless
+helpers with no `poll()` dependency at all — `activateHint()` (label for the gesture that
+performs `KEY_ENTER`/`KEY_SELECT` on this board: "long press"/"tap"/"click"/"press Enter"/
+"press"), `moveHint()` (label for `KEY_NEXT`/`KEY_PREV` list movement: "click/dbl-click"/
+"swipe"/"trackball"/"stick"/"turn"), and `textEntryHint(buf, size)` (the two-clause line
+`FormField`'s `TextField` shows, since keyboard boards need a real second sentence, not just a
+relabeled gesture). These replace ui-new's `PRESS_LABEL` macro (a single compile-time `#if
+UI_HAS_JOYSTICK`/`#else`, ported verbatim into `Screen_Bluetooth`/`Advert`/`Shutdown` in Phase
+1) and the literal button-press wording `FormField`'s three interactive editors used to draw.
+Every board macro `InputRouter::poll()` already checks is also what these three functions
+switch on, so adding a new control scheme's gesture-to-key mapping and its hint label happen in
+the same file, in one place.
+
 ### `Layout` (header-only)
 
 `DisplayDriver` doesn't expose a font-height accessor, so `Layout::rowHeight(textSize)`
@@ -296,6 +332,15 @@ leaf screens (cancel/back) already established, extended to a third meaning.
 
 `MenuScreen::activate()` is the only caller of the four `FormField::openXxxField()` functions —
 see that class's section above for the `MenuItem`/spec wiring.
+
+**Phase 6 addition: `TextField` gained a second, additive input path.** `handleInput()`
+now also accepts a raw byte in `[32,127)` (typed at the cursor, cursor advances — capped once
+the buffer is full, see PROGRESS.md's Phase 6 "Real bug found and fixed") and `8`/`127`
+(backspace/delete). This is exactly the byte `InputRouter`'s `LILYGO_TDECK` block feeds through
+unchanged from `lilygo_tdeck`'s keyboard co-processor — no other screen interprets a raw
+printable byte, so this is a no-op everywhere else by construction. The increment-picker
+gestures above are untouched and still reachable via the same board's trackball-click button;
+this is a second path, not a replacement, per phase-6.md's own framing.
 
 ### `ConfirmScreen`
 
@@ -614,16 +659,22 @@ Every per-board knob ui-forest reacts to is a compile-time macro set in that boa
 | `AUTO_OFF_MILLIS` | display auto-off delay (default 15000, `0` disables) | `UITask::loop()` |
 | `AUTO_SHUTDOWN_MILLIVOLTS` | battery voltage that triggers auto-shutdown | `UITask::loop()` (`heltec_rc32`'s forest env sets this to 3400) |
 | `KEEP_DISPLAY_ON_USB` | opt-in: don't auto-off while externally powered | `UITask::loop()` |
-| `WIFI_SSID` / `BLE_PIN_CODE` / `ETHERNET_ENABLED` | which transport `main.cpp` compiled in (checked in that precedence order, else USB) | `Transport.h` (Phase 4) -- resolves to `UI_FOREST_TRANSPORT_NAME`, consumed by `Screen_DiagCore` and `UITask::updateStatusBar()` |
+| `WIFI_SSID` / `BLE_PIN_CODE` / `ETHERNET_ENABLED` | which transport `main.cpp` compiled in (checked in that precedence order, else USB) | `Transport.h` (Phase 4) -- resolves to `UI_FOREST_TRANSPORT_NAME`, consumed by `Screen_DiagCore` and `UITask::updateStatusBar()`. Reports "USB" (wrong) on `sensecap_indicator-espnow`, whose ESPNOW transport isn't in this precedence chain at all -- known, deliberately unfixed this phase, see PROGRESS.md's Phase 6 section |
+| `HAS_TOUCH` | capacitive touchscreen present (`sensecap_indicator-espnow`) | `InputRouter` (Phase 6 -- tap/swipe polling block); also the gate `InputRouter::activateHint()`/`moveHint()` check first |
+| `LILYGO_TDECK` | keyboard co-processor + trackball present (`lilygo_tdeck`) | `InputRouter` (Phase 6 -- trackball/keyboard polling block, and the hint functions' second-highest precedence check) |
+| `TDECK_TRACKBALL_UP` / `_DOWN` / `_LEFT` / `_RIGHT` | trackball direction GPIO pins, `#ifndef`-defaulted in `variants/lilygo_tdeck/target.h` (Phase 6) | `variants/lilygo_tdeck/target.cpp` (the `trackball_*` `MomentaryButton` globals `InputRouter` polls) |
+| `TDECK_KEYBOARD_I2C_ADDR` | keyboard co-processor's I2C address, `#ifndef`-defaulted in `TDeckKeyboard.h` (Phase 6) | `TDeckKeyboard::poll()` |
 
 ## Rollout mechanism
 
-Each pilot board gets one new `_companion_radio_forest_ble` env in its own
+Each pilot board gets one new `_companion_radio_forest_ble`/`_forest_usb` env in its own
 `variants/<board>/platformio.ini`, `extends`-ing the board's base section (not the existing
-`_ble` env) and restating `build_flags`/`build_src_filter`/`lib_deps` from scratch with two
-lines changed: the `-I` path and the `ui-*/*.cpp` glob. Existing `_ble`/`_usb`/`_wifi` envs
-for every board are untouched. See any of the four `variants/*/platformio.ini` files' forest
-env for the exact template; `PROGRESS.md` lists which four boards have one today.
+`_ble`/`_usb` env) and restating `build_flags`/`build_src_filter`/`lib_deps` from scratch with
+two lines changed: the `-I` path and the `ui-*/*.cpp` glob. Existing `_ble`/`_usb`/`_wifi` envs
+for every board are untouched. See any of the six `variants/*/platformio.ini` files' forest env
+for the exact template (`sensecap_indicator-espnow`'s is named `_comp_radio_forest_usb`, not
+`_companion_radio_forest_usb` — matches that board's existing, already-shortened `_comp_radio_usb`
+env, see PROGRESS.md's Phase 6 section); `PROGRESS.md` lists which six boards have one today.
 
 ## Phase 5 additions (visual polish)
 
@@ -870,3 +921,17 @@ env for the exact template; `PROGRESS.md` lists which four boards have one today
   phase-5-visual-polish.md's "Prerequisites" section calling their Phase 5 pass "a regression sweep",
   none of the three has been physically tested on *any* phase 0-4 either -- Phase 5 is their first
   hardware pass for everything, not a regression check.
+- **Phase 6's shared-file changes regression-cleared on `WioTrackerL1`, but its two actual pilot
+  boards (`lilygo_tdeck`/`sensecap_indicator-espnow`) have never run any phase of `ui-forest` at
+  all, and the user has no hardware for either.** See PROGRESS.md's Phase 6 section for the full
+  account, including per-item confidence levels -- the `WioTrackerL1` pass only confirms this
+  phase didn't break already-working boards (neither `HAS_TOUCH` nor `LILYGO_TDECK` compiles in
+  on it), it says nothing about whether touch/keyboard/trackball actually work. In short: dynamic
+  hints (item 32) are a low-risk refactor of already-working code; touch (item 33) is reasoned
+  through by reading `LGFXDisplay.cpp`/`SCIndicatorDisplay.h` but not finger-tested; keyboard+
+  trackball (item 34) rests on published-but-unverified-in-this-repo pin assignments and I2C
+  protocol for `lilygo_tdeck` specifically, and is the most likely part of this phase to need a
+  real-hardware correction whenever that board becomes available to test on.
+  `sensecap_indicator-espnow`'s forest env also reports the wrong transport name ("USB" instead
+  of "ESPNOW") via a pre-existing `Transport.h` gap this phase surfaced but deliberately didn't
+  fix (out of scope, cosmetic-only).

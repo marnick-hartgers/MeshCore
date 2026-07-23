@@ -21,6 +21,14 @@ public:
   // that want to convey meaning via color (e.g. red=warning) know to fall
   // back to LIGHT/DARK instead of picking a hue that has no effect there.
   virtual bool supportsColor() { return true; }
+  // Optional capability query (Phase 6, item 33): does this backend have a
+  // touchscreen, and if so, what's the current touch point (in this
+  // DisplayDriver's own logical width()/height() coordinate space)? Default
+  // false/no-op for backends with no touch hardware -- same "default no-op
+  // override in the one backend that has it" convention isEink()/
+  // supportsColor() already use. Callers (InputRouter) go through the
+  // DisplayDriver* they already hold, no cast, no per-backend accessor.
+  virtual bool getTouch(int* x, int* y) { return false; }
   virtual void turnOn() = 0;
   virtual void turnOff() = 0;
   virtual void clear() = 0;

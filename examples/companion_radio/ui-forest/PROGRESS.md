@@ -790,6 +790,26 @@ limitation as every prior phase. Nothing in this phase has been flashed yet; see
 "Phase 5 additions"/"Known gaps" sections for the full technical account, this section is the
 narrative/decisions log.
 
+### Status heading into Phase 6
+
+Phase 5 is code-complete but **not yet hardware-tested at all** -- unlike every prior phase,
+there is no informal `WioTrackerL1` pass yet, let alone one for the other three pilots. Four
+bugs were caught during the user's review of this phase's diff, before any flash, and fixed
+same-session (battery gauge not clearing its own background, color choices not checking
+`supportsColor()`, the screen-transition wipe reverted after reading as a flash/glitch, and
+emoji in node names now stripped rather than substituted) -- see "Bugs found in user review"
+below for the full account of each. Read that section before touching `StatusBar`/`Layout`/
+color-related code again so none of the four get reintroduced.
+
+Recommended hardware test order once a build is available: `WioTrackerL1` first, since it's
+the only board with any track record on `ui-forest` (every prior phase's device pass ran on
+it) -- confirms the baseline still holds before spending time on boards with zero history.
+Then `RAK_4631`/`gat562_30s_mesh_kit`/`heltec_rc32`/`lilygo_techo`, in whatever order is
+convenient -- none of the four has run any phase of `ui-forest` on real hardware yet, so each
+is a first-time pass for everything built across Phases 0-5, not a regression check (see "Two
+things resolved before starting" below for `RAK_4631`/`gat562_30s_mesh_kit`/`heltec_rc32`
+specifically; `lilygo_techo` is new as of this phase and covered in "Not yet done" below).
+
 ### Two things resolved before starting, per the user's corrections to this phase's own spec
 
 - **The Phase 4 status-bar-flash fix (compositing/`status_due`) was NOT re-verified on hardware
@@ -1003,3 +1023,226 @@ none has been device-confirmed yet, same as the rest of Phase 5.
   `setColor()` implementation, not device-confirmed -- worth a real side-by-side look on
   `heltec_rc32` (`NV3001BDisplay`, should still show red/green/yellow) vs. any monochrome pilot
   (should now show every accent color as plain white/on) once hardware is available.
+
+## Phase 6 — Input/control expansion: REGRESSION-CLEARED ON WioTrackerL1, NEW CAPABILITIES STILL ENTIRELY UNVERIFIED (no lilygo_tdeck/sensecap_indicator-espnow hardware available)
+
+Spec: `phases/phase-6-input-control-expansion.md`. Same no-`pio`/no-`g++` limitation as every
+prior phase, plus a bigger one specific to this phase: `lilygo_tdeck`'s keyboard co-processor
+and trackball, and `sensecap_indicator-espnow`'s touch panel, are the first *new hardware
+capabilities* (not just new screens/menus over what Phases 0-5 already exercised) this project
+has wired up sight-unseen. Confidence is not uniform across this phase's three build items --
+see "Confidence levels" below before trusting any one part of it equally.
+
+### Confidence levels (read this before the device pass)
+
+- **Dynamic on-screen control hints (item 32):** high confidence. Pure refactor of existing,
+  already-working code paths (`InputRouter::activateHint()`/`moveHint()`/`textEntryHint()`
+  replace literal strings and the ui-new-ported `PRESS_LABEL` macro) -- no new hardware
+  interaction, just different text on screens that already render correctly today.
+- **SenseCAP touch wiring (item 33):** medium-high confidence. `LGFXDisplay::getTouch()`
+  already existed and, on reading it plus `SCIndicatorDisplay.h`'s `LGFX` config, turned out to
+  already handle the two things phase-6.md flagged as unverified: it divides by `UI_ZOOM`
+  before returning (so coordinates already come out in this board's logical `display.width()`/
+  `height()` space, not raw panel pixels), and the touch controller (`Touch_FT5x06`) is
+  pre-configured with `x_max=479`/`y_max=479` matching the panel's own 480x480 native
+  resolution with rotation handled by LovyanGFX's own touch-to-panel-rotation mapping. This is
+  "confirmed by reading the actual config in this repo," not a guess -- see "Resolved open
+  questions" below. What's still unverified is only whether that LovyanGFX-internal rotation
+  mapping actually lines up correctly in practice (no way to check without the physical panel).
+- **T-Deck keyboard + trackball wiring (item 34): lower confidence, flagged prominently.**
+  Nothing in this repo touched T-Deck's keyboard or trackball before this phase (confirmed by
+  grep -- no TCA8418/keyboard/trackball reference anywhere in the codebase). The trackball pin
+  assignments (`TDECK_TRACKBALL_UP/DOWN/LEFT/RIGHT` = GPIO 3/15/1/2 in `target.h`) and the
+  keyboard's I2C protocol (single-byte ASCII read from address `0x55`, `TDeckKeyboard.h`) are
+  both taken from the widely-published community T-Deck v1 pinout/protocol (the same one used
+  by, among others, Meshtastic's T-Deck input driver and several open T-Deck example sketches)
+  -- **not verified against a schematic or datasheet present in this repo**, since no T-Deck
+  hardware or internet access to a primary source is available in this dev environment. This is
+  meaningfully different from every prior "compiled but hardware-unverified" flag elsewhere in
+  this project (e.g. `HAS_TORCH`/`PIN_STATUS_LED`), which exercised macros/hooks the codebase
+  already defined -- here the pin numbers and I2C address themselves are new, external
+  knowledge, not derived from anything already in this repo. If the keyboard/trackball don't
+  respond on real hardware, this is the first thing to check, and the two files most likely to
+  need a real-hardware correction are `variants/lilygo_tdeck/target.h` (pin macros) and
+  `variants/lilygo_tdeck/TDeckKeyboard.h` (I2C address/protocol).
+
+### Resolved open questions (from phase-6.md and PLAN.md §8)
+
+- **`LGFXDisplay::getTouch()`'s coordinate/rotation semantics:** resolved by reading the code,
+  not by device test. `LGFXDisplay.cpp`'s existing `getTouch()` implementation already divides
+  the raw `lgfx::v1::touch_point_t` by `UI_ZOOM` before returning -- the exact same scaling
+  `endFrame()` applies when compositing the sprite buffer onto the physical panel -- so a touch
+  point and a screen coordinate computed by any `ui-forest` screen (which only ever deals in
+  `display.width()`/`height()`, i.e. the post-`UI_ZOOM` logical size) are already in the same
+  space with zero adjustment needed in `InputRouter`. Separately, `SCIndicatorDisplay.h`'s `LGFX`
+  config gives its `Touch_FT5x06` instance `x_max=479`/`y_max=479`, matching the panel's native
+  480x480 resolution one-for-one -- rotation itself (`panel.offset_rotation=1` vs.
+  `touch.offset_rotation=0`) is handled by LovyanGFX internally mapping touch coordinates through
+  whatever rotation `setRotation()` last applied to the panel, which is exactly the mechanism
+  this two-line difference is designed to feed. Not re-verified by an actual finger on an actual
+  panel -- flagged in "Not yet done" below.
+- **`getTouch(int*, int*)` not being on the shared `DisplayDriver*` `InputRouter`/`UITask` hold:**
+  resolved via the virtual-method route phase-6.md itself leaned towards -- `DisplayDriver::
+  getTouch()` (new, default `return false`) added right alongside `isEink()`/`supportsColor()`,
+  same "default no-op override in the one backend that has it" convention; `LGFXDisplay::
+  getTouch()` marked `override`. `UITask` gains one new thin passthrough (`bool getTouch(int*,
+  int*) const`), matching `isDisplayOn()`'s existing shape, so `InputRouter` never needs a cast
+  or a new accessor.
+- **Whether `HAS_TOUCH` needed a fresh gating convention:** yes, and it's now the same shape as
+  every other board-capability macro `InputRouter` already checks (`#if defined(HAS_TOUCH)`),
+  consulted only if no higher-priority input source already produced a key this frame, same
+  precedence rule the rotary/analog/torch blocks already follow.
+- **Whether `sensecap_indicator-espnow`'s ESPNOW transport needs special handling from Phase 4's
+  transport-indicator work:** checked `Transport.h` -- its precedence chain is `WIFI_SSID` /
+  `BLE_PIN_CODE` / `ETHERNET_ENABLED` / else-USB, and this board's new forest env defines none of
+  those three, so it falls through to the `#else` branch and reports `"USB"`. That's wrong (this
+  board's actual transport is ESPNOW, wired via `helpers/esp32/ESPNOWRadio.cpp` in its
+  `platformio.ini`, not picked via any of `main.cpp`'s `BaseSerialInterface` `#if` chain at all --
+  confirmed by re-reading `main.cpp`'s precedence list, none of which mentions ESPNOW) -- **but
+  deliberately left unfixed this phase**, since fixing `Transport.h` correctly means also
+  checking how `main.cpp` decides to skip the whole `BaseSerialInterface` selection for ESPNOW
+  boards in the first place, which is outside this phase's stated scope (item 32-34 only) and
+  risks a wider regression across every board for a cosmetic-only diagnostics-screen/status-bar
+  label. Flagged here as a known-wrong value (`Screen_DiagCore`'s Transport row and the status
+  bar's transport label will both show "USB" on this board) rather than silently left for
+  someone to rediscover as a mystery.
+
+### Built
+
+All new/changed in `examples/companion_radio/ui-forest/` unless noted, per phase-6.md:
+
+- **Dynamic control hints (item 32)** -- `InputRouter` gained three static, stateless helpers
+  (`activateHint()`, `moveHint()`, `textEntryHint()`) that return a short, this-board's-real-
+  gesture label ("long press"/"tap"/"click"/"press Enter"/"press"; "click/dbl-click"/"swipe"/
+  "trackball"/"stick"/"turn") based purely on which board macros are compiled in -- no instance
+  state needed, so every screen calls them directly. Replaced ui-new's `PRESS_LABEL` macro
+  (ported verbatim into three ui-forest screens in Phase 1) in `Screen_Bluetooth.cpp`/
+  `Screen_Advert.cpp`/`Screen_Shutdown.cpp`, and the literal "ENTER: toggle" / "< adjust
+  ENTER: save" / "PREV: next char, ENTER: save" hint strings in `FormField.cpp`'s `ToggleField`/
+  `StepperField`/`TextField`. `TextField` gets its own two-clause builder (`textEntryHint()`)
+  since it needs to advertise both input paths on keyboard boards, not just relabel one gesture.
+- **SenseCAP touch wiring (item 33)** -- `DisplayDriver::getTouch(int*, int*)` (new virtual,
+  default `false`) in `src/helpers/ui/DisplayDriver.h`; `LGFXDisplay::getTouch()` marked
+  `override` (`src/helpers/ui/LGFXDisplay.h`); `UITask::getTouch(int*, int*) const` passthrough
+  (`UITask.h`). `InputRouter::poll()` gained a `#if defined(HAS_TOUCH)` block: tracks touch-down/
+  touch-up across polls, and on touch-up classifies the total start-to-end delta as a tap
+  (`KEY_ENTER`, if both axes moved less than `TOUCH_SWIPE_THRESHOLD`=12px) or a swipe on
+  whichever axis moved more (`KEY_NEXT`/`KEY_PREV` -- right/up = next, left/down = prev,
+  matching `MenuScreen`'s existing "any of NEXT/DOWN/RIGHT move the cursor down" equivalence, see
+  ARCHITECTURE.md). Purely additive: this board's existing `PIN_USER_BTN=38` fallback button
+  (single-button vocabulary, already wired since this board's `platformio.ini` already defined
+  the pin) is untouched by this change.
+- **T-Deck keyboard + trackball wiring (item 34)** -- new `variants/lilygo_tdeck/TDeckKeyboard.h`
+  (header-only; see "Confidence levels" above for its I2C address/protocol provenance).
+  `variants/lilygo_tdeck/target.h`/`.cpp` gained four `MomentaryButton` trackball-direction
+  globals (`trackball_up/down/left/right`, pins via new `TDECK_TRACKBALL_*` macros,
+  overridable via build_flags) and one `TDeckKeyboard tdeck_keyboard` global, following the
+  exact "declare pins as `#ifndef`-guarded defaults in target.h, instantiate in target.cpp"
+  pattern `TDeckBoard.h`'s own `PIN_VBAT_READ` already uses, and the exact `MomentaryButton`
+  wiring style `wio-tracker-l1`'s Phase 0 `joystick_up`/`joystick_down` addition already
+  established (see this file's Phase 0 section) -- multiclick explicitly disabled
+  (`MomentaryButton`'s last ctor arg) so a rolling trackball's rapid pulses each become one key
+  immediately instead of waiting out a double/triple-click window. `InputRouter::poll()` gained
+  a `#if defined(LILYGO_TDECK)` block: trackball directions map to `KEY_UP/DOWN/LEFT/RIGHT`
+  (additive to the existing `PIN_USER_BTN=0` click-only wiring, only consulted if that branch
+  didn't already produce a key this frame); the keyboard's raw ASCII byte is fed straight
+  through as the returned key code, throttled to a 20ms poll interval (mirrors
+  `PIN_USER_BTN_ANA`'s own ADC-read throttling). `FormField.cpp`'s `TextField::handleInput()`
+  gained the actual typing behavior: any byte in `[32,127)` is written at the cursor and the
+  cursor advances (capped once the buffer is full, see "Real bug found and fixed" below);
+  8/127 (backspace/delete) erase. This never collides with the existing `KEY_*`/increment-picker
+  vocabulary -- see the in-code comment on why -- and is a no-op on every screen except
+  `TextField` by construction (every other screen's `handleInput()` ignores unrecognized bytes).
+  The increment-based picker (`KEY_NEXT`/`KEY_PREV`/`KEY_ENTER`) is untouched and still reachable
+  via the trackball's click button's single-button vocabulary, matching phase-6.md's explicit
+  "second path, not a replacement" framing.
+- **New envs**: `LilyGo_TDeck_companion_radio_forest_ble` (`variants/lilygo_tdeck/
+  platformio.ini`) and `SenseCapIndicator-ESPNow_comp_radio_forest_usb`
+  (`variants/sensecap_indicator-espnow/platformio.ini`) -- both the same two-line-diff pattern
+  (`-I` path, `ui-*/*.cpp` glob) as every other forest env, extending each board's shared base
+  section (not the existing `_ble`/`_usb` env) per PLAN.md §5, mirroring `WioTrackerL1_
+  companion_radio_forest_ble`'s exact template.
+
+### Real bug found and fixed during tracing (no compiler available, same discipline as Phase 3)
+
+`TextField::handleInput()`'s first draft of the typed-character path advanced `_cursor` up to
+`_max_len` unconditionally once the field is full, which doesn't match the invariant the
+existing `KEY_PREV` cursor-advance logic already relies on (cursor never reaches `_max_len`
+once `_len == _max_len` -- there's no append slot left once full, so `_len` itself isn't a valid
+cursor position at that point, only `_len - 1` is). Left as originally written, a full text
+field would let the cursor drift one past the last real character and start silently
+overwriting the buffer's own null-terminator byte on every subsequent keystroke (each such byte
+stays inside the 32-byte `_buf` array -- not a memory-safety bug -- but the string would render/
+commit correctly only because `render()`'s `shown` copy and the `KEY_ENTER` commit path both
+independently re-truncate/re-terminate; still clearly not the intended behavior). Fixed by
+capping the post-write cursor at `_len` when there's still an append slot, or `_len - 1` once
+full -- the same value `KEY_PREV`'s own modulo arithmetic already treats as the ceiling. Caught
+by tracing the exact cursor-position invariant end to end before calling this done, not by a
+compiler/sanitizer -- same category of bug as Phase 3's `TextField::begin()` buffer overflow.
+
+### Decisions / deviations worth knowing about
+
+- **`backHint()` was designed, then removed before committing.** The natural "activate/back/
+  move" triad would have included a per-board Cancel-gesture label, but grep found zero existing
+  hint-text call sites anywhere in `ui-forest` that mention Cancel/back (`MenuScreen` shows no
+  button hints at all; the only five hint-text locations in the whole codebase are the three leaf
+  screens and three `FormField` editors this phase already touches, none of which describe
+  Cancel). Cut rather than shipped as unused public API -- easy to re-add if a future phase finds
+  a real call site.
+- **Touch swipe direction mapping (right/up = next, left/down = prev) is a judgment call, not
+  something phase-6.md pins down exactly.** phase-6.md explicitly leaves this open ("swipe
+  (direction inferred from touch-start/touch-end delta) -> KEY_NEXT/KEY_PREV (or LEFT/RIGHT,
+  matching whatever MenuScreen already expects")). Chose "up or right = next" to match a common
+  mobile-scroll convention (swiping up reveals content below, i.e. moves the selection down the
+  list); easy to flip if it feels backwards on real hardware -- it's a two-line change in
+  `InputRouter.cpp`'s `HAS_TOUCH` block.
+- **`Transport.h` now reports the wrong transport name for `sensecap_indicator-espnow`** ("USB"
+  instead of "ESPNOW") -- see "Resolved open questions" above for why this was flagged rather
+  than fixed in this phase.
+- **Keyboard input is fed as a raw byte, not translated into a synthetic `KEY_*` code**, on the
+  reasoning that plain printable ASCII (32-126) can never collide with the existing vocabulary
+  (0xB4-0xF3 plus three control codes already claimed by SELECT/ENTER/CANCEL, which a real
+  keyboard's own Enter/Escape keys are expected to send anyway) -- see the in-code comment in
+  `InputRouter.cpp`. This means `TextField` is the only screen that needs to know keyboards
+  exist at all; `InputRouter`, `MenuScreen`, and every other screen stay completely unaware.
+
+### Not yet done / needs hardware verification
+
+- **Nothing in Phase 6 has been flashed or built with a real compiler.** Same no-`pio`/no-`g++`
+  limitation as every prior phase, compounded here by two boards (`lilygo_tdeck`,
+  `sensecap_indicator-espnow`) that have never run any phase of `ui-forest` before this one --
+  this is a first-time hardware pass for Phases 0-6 combined on both, not a regression check.
+- **Highest-priority check: does `tdeck_keyboard`/the trackball pins respond at all** -- see
+  "Confidence levels" above. If not, `variants/lilygo_tdeck/target.h`'s `TDECK_TRACKBALL_*`
+  macros and `TDeckKeyboard.h`'s I2C address/protocol are the first things to correct against
+  real hardware (a logic analyzer or oscilloscope on the trackball pins, and an I2C scanner
+  sketch for the keyboard, would resolve this faster than guessing further from here).
+- Touch tap/swipe on `sensecap_indicator-espnow` has never been tried against the physical
+  panel -- the coordinate/rotation reasoning in "Resolved open questions" is a paper argument
+  from reading `LGFXDisplay.cpp`/`SCIndicatorDisplay.h`, not a finger-on-glass confirmation.
+  `TOUCH_SWIPE_THRESHOLD`'s 12px value is a guess, not tuned against the panel's actual
+  480x480/`UI_ZOOM=3.5` scale -- worth adjusting if taps register as swipes or vice versa.
+- The `sensecap_indicator-espnow` forest env's Transport label (known-wrong, "USB" instead of
+  "ESPNOW", see "Decisions" above) hasn't been visually confirmed on the actual Diagnostics/
+  status-bar screens, only reasoned through from `Transport.h`'s source.
+- Regression check called for by phase-6.md's own checklist -- "every screen from Phases 1-5
+  still reachable and functional on both boards via their existing single-button/trackball-click
+  fallback" -- hasn't been attempted on either board (no device pass at all yet).
+- **Regression check: done, on `WioTrackerL1` (`WioTrackerL1_companion_radio_forest_ble`) --
+  user flashed and reports everything is fine.** `HAS_TOUCH`/`LILYGO_TDECK` are undefined for
+  this board, so none of this phase's new `InputRouter` blocks compile in on it at all -- this
+  confirms the shared-file edits that DO apply to every board regardless
+  (`DisplayDriver::getTouch()`'s new virtual, the `FormField.cpp`/`Screen_Bluetooth`/`Advert`/
+  `Shutdown.cpp` hint-string changes, `InputRouter::activateHint()`/`moveHint()`'s new
+  single-button-branch labels) didn't regress anything on the one board with an actual track
+  record across every prior phase. Informal pass, not phase-6.md's own checklist run.
+- **The user has no `lilygo_tdeck` or `sensecap_indicator-espnow` hardware.** This is the
+  important caveat: the WioTrackerL1 pass above is a regression check on *unrelated* code paths,
+  not a confirmation of anything this phase actually built. Touch tap/swipe, keyboard typing,
+  and trackball navigation remain **completely unverified** -- exactly as unverified as the
+  moment this phase's code was written. Whoever next has access to either board (or wants to
+  order one) is the one who can actually close out "Confidence levels" above; until then, treat
+  every claim in that section as a paper argument, not a test result, regardless of how this
+  phase's status line reads.
+- `RAK_4631`/`gat562_30s_mesh_kit`/`heltec_rc32`/`lilygo_techo` remain build-unverified for this
+  phase (same gap carried since Phase 0) -- only `WioTrackerL1` has any hardware track record.
