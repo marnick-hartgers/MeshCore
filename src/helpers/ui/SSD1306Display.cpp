@@ -50,6 +50,10 @@ void SSD1306Display::startFrame(Color bkg) {
   display.setTextColor(_color);
   display.setTextSize(1);
   display.cp437(true);         // Use full 256 char 'Code Page 437' font
+  // See SH1106Display::startFrame()'s comment: without this, Adafruit_GFX
+  // wraps StatusBar's off-screen-wide marquee print() onto the next text
+  // row, overlapping whatever the current screen drew there.
+  display.setTextWrap(false);
 }
 
 void SSD1306Display::setTextSize(int sz) {

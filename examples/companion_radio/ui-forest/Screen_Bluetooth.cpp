@@ -11,13 +11,20 @@
 
 int Screen_Bluetooth::render(DisplayDriver& display) {
   int top = Layout::statusBarHeight(true);
+  bool enabled = _task->isSerialEnabled();
 
-  display.setColor(DisplayDriver::GREEN);
+  // Color convention (Phase 5, item 30): green=connected/good, red=off --
+  // this is the one Phase 1 icon screen whose icon bitmap already changes
+  // with state (bluetooth_on/off) but whose color didn't follow it.
+  // Layout::accentColor() downgrades to plain LIGHT on displays that can't
+  // actually show red vs green (monochrome OLED/e-ink).
+  display.setColor(Layout::accentColor(display, enabled ? DisplayDriver::GREEN : DisplayDriver::RED));
   display.drawXbm((display.width() - 32) / 2, top + 4,
-      _task->isSerialEnabled() ? bluetooth_on : bluetooth_off,
+      enabled ? bluetooth_on : bluetooth_off,
       32, 32);
   display.setTextSize(1);
-  display.drawTextCentered(display.width() / 2, display.height() - 11, "toggle: " PRESS_LABEL);
+  display.setColor(DisplayDriver::LIGHT);
+  display.drawTextCentered(display.width() / 2, display.height() - Layout::rowHeight(), "toggle: " PRESS_LABEL);
 
   return 1000;
 }

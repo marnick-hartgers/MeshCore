@@ -23,6 +23,7 @@ public:
   bool begin();
   bool isOn() override { return _isOn; }
   bool isEink() override { return true; }
+  bool supportsColor() override { return false; }   // black/white e-ink only
   void turnOn() override;
   void turnOff() override;
   void clear() override;

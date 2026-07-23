@@ -15,7 +15,7 @@ int Screen_Advert::render(DisplayDriver& display) {
 
   display.setColor(DisplayDriver::GREEN);
   display.drawXbm((display.width() - 32) / 2, top + 4, advert_icon, 32, 32);
-  display.drawTextCentered(display.width() / 2, display.height() - 11, "advert: " PRESS_LABEL);
+  display.drawTextCentered(display.width() / 2, display.height() - Layout::rowHeight(), "advert: " PRESS_LABEL);
 
   return 1000;
 }
@@ -29,8 +29,10 @@ bool Screen_Advert::handleInput(char c) {
     _task->notify(UIEventType::ack);
     if (the_mesh.advert()) {
       _toast.show("Advert sent!", 1000);
+      _task->logEvent("Advert sent");
     } else {
       _toast.show("Advert failed..", 1000);
+      _task->logEvent("Advert failed");
     }
     return true;
   }

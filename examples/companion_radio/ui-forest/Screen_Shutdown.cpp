@@ -23,7 +23,7 @@ int Screen_Shutdown::render(DisplayDriver& display) {
   display.setColor(DisplayDriver::GREEN);
   display.setTextSize(1);
   display.drawXbm((display.width() - 32) / 2, top + 4, power_icon, 32, 32);
-  display.drawTextCentered(display.width() / 2, display.height() - 11, "hibernate: " PRESS_LABEL);
+  display.drawTextCentered(display.width() / 2, display.height() - Layout::rowHeight(), "hibernate: " PRESS_LABEL);
 
   return 1000;
 }

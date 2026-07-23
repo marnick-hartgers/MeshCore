@@ -56,6 +56,7 @@ public:
   }
 
   bool isOn() override { return _isOn; }
+  bool supportsColor() override { return false; }   // single-bit OLED buffer
 
   void turnOn() override {
     _u8g2.setPowerSave(0);

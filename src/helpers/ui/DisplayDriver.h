@@ -15,6 +15,12 @@ public:
 
   virtual bool isOn() = 0;
   virtual bool isEink() { return false; } // default to non-eink, override in eink drivers
+  // Whether this backend can actually distinguish RED/GREEN/BLUE/YELLOW/ORANGE
+  // from plain on/off. Default true (assume a real color panel); monochrome
+  // backends (single-bit OLED/e-ink buffers) override this false so callers
+  // that want to convey meaning via color (e.g. red=warning) know to fall
+  // back to LIGHT/DARK instead of picking a hue that has no effect there.
+  virtual bool supportsColor() { return true; }
   virtual void turnOn() = 0;
   virtual void turnOff() = 0;
   virtual void clear() = 0;

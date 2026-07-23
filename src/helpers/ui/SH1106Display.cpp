@@ -42,6 +42,18 @@ void SH1106Display::startFrame(Color bkg)
   display.setTextColor(_color);
   display.setTextSize(1);
   display.cp437(true); // Use full 256 char 'Code Page 437' font
+  // Adafruit_GFX::write() wraps to the next text row once cursor_x would run
+  // past the right edge -- harmless for normal left-aligned text, but
+  // StatusBar's marquee scroll deliberately prints its (screen-width-exceeding)
+  // string starting at a negative x so it can slide across the strip. With
+  // wrap left on, that same print() call runs off the right edge partway
+  // through the string and wraps down onto row 8+, painting the tail of the
+  // status text on top of whatever the current screen just drew there --
+  // this is the root cause of the long-standing status-bar/menu-content
+  // overlap bug (confirmed on WioTrackerL1/SH1106, PROGRESS.md Phase 2/4).
+  // Disabling wrap makes off-edge characters clip instead, which is exactly
+  // what a horizontally-scrolling marquee needs.
+  display.setTextWrap(false);
 }
 
 void SH1106Display::setTextSize(int sz)

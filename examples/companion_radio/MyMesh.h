@@ -181,6 +181,20 @@ public:
   // To check if there is pending work
   bool hasPendingWork() const;
 
+  // ui-forest Phase 3 on-device Settings danger-zone actions. Mirror
+  // CMD_FACTORY_RESET / CMD_IMPORT_PRIVATE_KEY's identity-regen side effect
+  // (MyMesh.cpp) -- both touch state private to this class (_store, self_id,
+  // resetContacts()) that UITask can't reach directly, same reason
+  // getBLEPin()/getRecentlyHeard()-style passthroughs exist on this class.
+  bool factoryReset();
+  bool selfRekey();
+  bool isValidClientRepeatFreq(uint32_t f) const;
+
+  // ui-forest Phase 4 diagnostics -- _mgr is protected on Dispatcher, not
+  // reachable from UITask directly, same passthrough shape as the two methods
+  // above (PLAN.md 3.4 "Core/queue stats" row).
+  uint32_t getQueueLen() const { return _mgr->getOutboundTotal(); }
+
 private:
   void writeOKFrame();
   void writeErrFrame(uint8_t err_code);
@@ -198,7 +212,6 @@ private:
 
   void checkCLIRescueCmd();
   void checkSerialInterface();
-  bool isValidClientRepeatFreq(uint32_t f) const;
 
   // helpers, short-cuts
   void saveChannels() { _store->saveChannels(this); }

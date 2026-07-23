@@ -83,6 +83,10 @@ void ST7789LCDDisplay::startFrame(Color bkg) {
   display.setTextColor(ST77XX_WHITE);
   display.setTextSize(1 * DISPLAY_SCALE_X); // This one affects size of Please wait... message
   display.cp437(true); // Use full 256 char 'Code Page 437' font
+  // See SH1106Display::startFrame()'s comment: without this, Adafruit_GFX
+  // wraps StatusBar's off-screen-wide marquee print() onto the next text
+  // row, overlapping whatever the current screen drew there.
+  display.setTextWrap(false);
 }
 
 void ST7789LCDDisplay::setTextSize(int sz) {

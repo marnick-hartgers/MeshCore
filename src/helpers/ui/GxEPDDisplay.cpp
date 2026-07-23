@@ -65,6 +65,10 @@ void GxEPDDisplay::startFrame(Color bkg) {
   display.fillScreen(GxEPD_WHITE);
   display.setTextColor(_curr_color = GxEPD_BLACK);
   display_crc.reset();
+  // See SH1106Display::startFrame()'s comment: GxEPD2 extends Adafruit_GFX
+  // too, so any print()/drawTextCentered() call wider than the panel would
+  // otherwise wrap onto the next text row instead of clipping.
+  display.setTextWrap(false);
 }
 
 void GxEPDDisplay::setTextSize(int sz) {

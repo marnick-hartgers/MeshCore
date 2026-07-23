@@ -24,6 +24,13 @@ public:
   bool begin();
 
   bool isOn() override { return _isOn; }
+  // ST7789Spi drives this color-capable panel through ThingPulse's OLEDDisplay
+  // (see ST7789Spi.h), a strict 1-bit framebuffer -- confirmed by
+  // ST7789Display.cpp's setColor(), whose non-DARK color cases are all #if 0'd
+  // out and fall through to a single WHITE default. Real color TFTs elsewhere
+  // in this codebase (ST7735Display/ST7789LCDDisplay/NV3001BDisplay) don't
+  // have this restriction; this one specifically does.
+  bool supportsColor() override { return false; }
   void turnOn() override;
   void turnOff() override;
   void clear() override;

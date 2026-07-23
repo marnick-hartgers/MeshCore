@@ -26,6 +26,18 @@ struct MenuItem {
   MenuActionFn action;      // used when kind == Action
   void* action_ctx;
   UIScreen* submenu;        // used when kind == Submenu
+
+  // Optional per-row color override (Phase 5, item 30's color convention),
+  // used for the row's *unselected* color instead of the default LIGHT --
+  // e.g. Screen_SettingsDanger tints its destructive rows RED so the warning
+  // reads even before the row is highlighted. has_tint defaults false via
+  // this struct's own default member initializers, so every existing
+  // MenuItem-building call site (which sets the other fields individually,
+  // not via aggregate init) is unaffected without needing to touch any of
+  // them -- the implicit default constructor zero-initializes this pair for
+  // every array element.
+  DisplayDriver::Color tint = DisplayDriver::LIGHT;
+  bool has_tint = false;
 };
 
 // Generic list-menu widget: the single class that implements Home, Settings,
@@ -42,6 +54,7 @@ class MenuScreen : public UIScreen {
   int _selected;
   int _scroll_offset;
   bool _status_bar_shown;
+  bool _has_icons;
 
   void activate(int index);
 
@@ -51,7 +64,14 @@ public:
   // with StatusBar's always-rendered strip.
   MenuScreen(NavStack& nav, ToastOverlay& toast, const char* title, MenuItem* items, int count, bool status_bar_shown = false)
     : _nav(nav), _toast(toast), _title(title), _items(items), _count(count),
-      _selected(0), _scroll_offset(0), _status_bar_shown(status_bar_shown) { }
+      _selected(0), _scroll_offset(0), _status_bar_shown(status_bar_shown), _has_icons(false) {
+    // Cached once (item arrays are static/built-once tables, never mutated
+    // after construction -- PLAN.md 3.6) so render() doesn't need to rescan
+    // every frame just to pick a row height (Phase 5, see Layout::iconRowHeight()).
+    for (int i = 0; i < _count; i++) {
+      if (_items[i].icon != NULL) { _has_icons = true; break; }
+    }
+  }
 
   // Reset cursor/scroll to the top -- call when (re)entering this screen from
   // a different menu, so it doesn't retain a stale selection.

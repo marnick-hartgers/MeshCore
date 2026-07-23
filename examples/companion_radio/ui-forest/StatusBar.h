@@ -23,6 +23,7 @@ class StatusBar {
   int _display_width;
   unsigned long _next_scroll;
   bool _needs_redraw;
+  bool _is_eink;
 
   uint16_t _batt_mv;
   bool _muted;
@@ -33,7 +34,14 @@ class StatusBar {
 public:
   StatusBar();
 
-  void begin(int display_width);
+  // is_eink (Phase 5, PLAN.md 3.3's e-ink gating) disables the marquee scroll
+  // entirely -- e-ink panels have no partial/fast-refresh path here (every
+  // DisplayDriver backend's startFrame() does a full clear, and e-ink
+  // additionally has real per-refresh latency/flicker cost), so scrolling
+  // would mean visibly redrawing the whole strip every ~80ms for no benefit.
+  // The truncated/static form is shown instead, matching PLAN.md 3.3's
+  // "no marquee-scrolling StatusBar on e-ink" callout.
+  void begin(int display_width, bool is_eink = false);
 
   // Rebuilds cached width only if the text actually changed.
   void setText(DisplayDriver& display, const char* text);

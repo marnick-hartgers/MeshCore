@@ -12,7 +12,7 @@ int Screen_Recents::render(DisplayDriver& display) {
   display.setColor(DisplayDriver::GREEN);
   display.setTextSize(1);
   int y = Layout::statusBarHeight(true) + 2;
-  for (int i = 0; i < UI_RECENT_LIST_SIZE; i++, y += 11) {
+  for (int i = 0; i < UI_RECENT_LIST_SIZE; i++, y += Layout::rowHeight()) {
     auto a = &recent[i];
     if (a->name[0] == 0) continue;  // empty slot
 

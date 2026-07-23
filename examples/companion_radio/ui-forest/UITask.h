@@ -27,12 +27,29 @@
 #include "StatusBar.h"
 #include "MenuScreen.h"
 #include "ConfirmScreen.h"
+#include "FormField.h"
+#include "EventLog.h"
+#include "Transport.h"
 #include "Screen_Splash.h"
 #include "Screen_Status.h"
 #include "Screen_Recents.h"
 #include "Screen_RadioInfo.h"
 #include "Screen_Bluetooth.h"
 #include "Screen_Advert.h"
+#include "Screen_Contacts.h"
+#include "Screen_ContactDetail.h"
+#include "Screen_Channels.h"
+#include "Screen_Settings.h"
+#include "Screen_SettingsRadio.h"
+#include "Screen_SettingsAdvert.h"
+#include "Screen_SettingsNetwork.h"
+#include "Screen_SettingsDevice.h"
+#include "Screen_SettingsDanger.h"
+#include "Screen_Diagnostics.h"
+#include "Screen_DiagRadio.h"
+#include "Screen_DiagPackets.h"
+#include "Screen_DiagCore.h"
+#include "Screen_EventLog.h"
 #if ENV_INCLUDE_GPS == 1
   #include "Screen_Gps.h"
 #endif
@@ -42,17 +59,22 @@
 #include "Screen_Shutdown.h"
 #include "Screen_MsgPreview.h"
 
-// Number of real top-level Home entries. Phase 1 pushes each screen straight
-// off Home as a Submenu-kind MenuItem (proper menu restructuring -- multiple
-// nesting levels, Contacts/Channels -- is Phase 2). GPS/Sensors entries are
+// Number of real top-level Home entries. GPS/Sensors entries are
 // conditionally compiled in, so the count/array is sized for the worst case
-// and only the first `_home_item_count` slots are used.
-#define UI_FOREST_HOME_ITEM_COUNT 8
+// (all optional screens present) and only the first `_home_item_count` slots
+// are used. Bumped from 10 to 11 in Phase 3 for "Settings"; bumped to 12 in
+// Phase 4 for "Diagnostics" -- phase-4-diagnostics.md's own stated
+// prerequisite (that Phase 3 already added this slot as a placeholder) didn't
+// hold (see PROGRESS.md/ARCHITECTURE.md), so this phase adds the Home entry
+// and its real content in one step instead of two.
+#define UI_FOREST_HOME_ITEM_COUNT 12
 
 // Entry point -- same public contract main.cpp already expects from
 // ui-new/ui-tiny (construct with board+serial, begin(display, sensors,
-// node_prefs), loop()). Phase 1 brings ui-forest to parity with ui-new's
-// feature set (PLAN.md Phase 1 / phases/phase-1-parity-with-ui-new.md).
+// node_prefs), loop()). Phase 1 brought ui-forest to parity with ui-new's
+// feature set; Phase 2 restructures Home into a real top-level menu and adds
+// Contacts/Channels browsing (PLAN.md Phase 2 /
+// phases/phase-2-navigation-and-data-browsing.md).
 class UITask : public AbstractUITask {
   DisplayDriver* _display;
   SensorManager* _sensors;
@@ -71,6 +93,21 @@ class UITask : public AbstractUITask {
   StatusBar _status_bar;
   ConfirmScreen _confirm;
 
+  // Phase 3: the four shared field-editor instances every settings screen's
+  // Toggle/Stepper/Enum/Text rows push (see FormField.h) -- one of each,
+  // reused across every settings screen, same "single shared instance,
+  // begin() reconfigures it" pattern _confirm already established.
+  ToggleField _toggle_field;
+  StepperField _stepper_field;
+  EnumField _enum_field;
+  TextField _text_field;
+
+  // Phase 4: fed by notify()/logEvent() at the points UITask/Screen_* already
+  // observe something worth logging (see EventLog.h). Shared with
+  // Screen_EventLog by reference, same "UITask owns it, screens read/write
+  // through a reference" shape as _toast/_status_bar.
+  EventLog _event_log;
+
   Screen_Splash* _splash;
   MenuScreen* _home;
   Screen_Status* _status;
@@ -78,6 +115,20 @@ class UITask : public AbstractUITask {
   Screen_RadioInfo* _radio_info;
   Screen_Bluetooth* _bluetooth;
   Screen_Advert* _advert;
+  Screen_ContactDetail* _contact_detail;
+  Screen_Contacts* _contacts;
+  Screen_Channels* _channels;
+  Screen_SettingsRadio* _settings_radio;
+  Screen_SettingsAdvert* _settings_advert;
+  Screen_SettingsNetwork* _settings_network;
+  Screen_SettingsDevice* _settings_device;
+  Screen_SettingsDanger* _settings_danger;
+  Screen_Settings* _settings;
+  Screen_DiagRadio* _diag_radio;
+  Screen_DiagPackets* _diag_packets;
+  Screen_DiagCore* _diag_core;
+  Screen_EventLog* _event_log_screen;
+  Screen_Diagnostics* _diagnostics;
 #if ENV_INCLUDE_GPS == 1
   Screen_Gps* _gps;
 #endif
@@ -106,8 +157,14 @@ public:
   UITask(mesh::MainBoard* board, BaseSerialInterface* serial)
     : AbstractUITask(board, serial), _display(NULL), _sensors(NULL), _node_prefs(NULL),
       _confirm(_nav),   // declared after _nav, so this is safe to init here (see .h field order)
+      _toggle_field(_nav), _stepper_field(_nav), _enum_field(_nav), _text_field(_nav),
       _splash(NULL), _home(NULL), _status(NULL), _recents(NULL), _radio_info(NULL),
       _bluetooth(NULL), _advert(NULL),
+      _contact_detail(NULL), _contacts(NULL), _channels(NULL),
+      _settings_radio(NULL), _settings_advert(NULL), _settings_network(NULL),
+      _settings_device(NULL), _settings_danger(NULL), _settings(NULL),
+      _diag_radio(NULL), _diag_packets(NULL), _diag_core(NULL),
+      _event_log_screen(NULL), _diagnostics(NULL),
 #if ENV_INCLUDE_GPS == 1
       _gps(NULL),
 #endif
@@ -131,6 +188,14 @@ public:
     return true;
 #endif
   }
+
+  // Phase 4: the one place any screen/UITask code appends to the diagnostic
+  // event ring buffer (EventLog.h) -- Screen_Advert/Screen_SettingsRadio call
+  // this via their existing UITask*/reference, same shape as toggleBuzzer()
+  // etc. Screen_EventLog is constructed with a direct reference to
+  // `_event_log` (see begin()), so it reads the buffer without going through
+  // UITask at all.
+  void logEvent(const char* text) { _event_log.push(text); }
 
   void toggleBuzzer();
   bool getGPSState();

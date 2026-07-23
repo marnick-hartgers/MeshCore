@@ -48,6 +48,7 @@ public:
 
   bool isOn() override { return _isOn; }
   bool isEink() override { return true; }
+  bool supportsColor() override { return false; }   // GxEPD2_BW -- black/white only
   void turnOn() override;
   void turnOff() override;
   void clear() override;

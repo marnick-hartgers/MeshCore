@@ -986,6 +986,41 @@ uint32_t MyMesh::getBLEPin() {
   return _active_ble_pin;
 }
 
+// ui-forest Phase 3: on-device equivalent of CMD_FACTORY_RESET's handler body
+// (this file, further down) -- disables serial first (phone app disconnects
+// before an OK frame could be sent anyway, so it's safe here too), formats
+// the filesystem, then reboots. Does not return on success.
+bool MyMesh::factoryReset() {
+  if (_serial) {
+    MESH_DEBUG_PRINTLN("Factory reset (on-device UI): disabling serial interface to prevent reconnects (BLE/WiFi)");
+    _serial->disable();
+  }
+  if (!_store->formatFileSystem()) return false;
+  board.reboot();  // does not return
+  return true;
+}
+
+// ui-forest Phase 3: on-device equivalent of CMD_IMPORT_PRIVATE_KEY's
+// identity-regen side effect, but generating a fresh random identity (same
+// reserved-hash retry loop as begin()) instead of importing a supplied one.
+bool MyMesh::selfRekey() {
+  mesh::LocalIdentity new_id = radio_new_identity();
+  int count = 0;
+  while (count < 10 && (new_id.pub_key[0] == 0x00 || new_id.pub_key[0] == 0xFF)) { // reserved id hashes
+    new_id = radio_new_identity();
+    count++;
+  }
+  if (!_store->saveMainIdentity(new_id)) return false;
+  self_id = new_id;
+  // re-load contacts from disk, to invalidate ecdh shared_secrets that were
+  // computed against the old identity (same comment/reasoning as
+  // CMD_IMPORT_PRIVATE_KEY's handler) -- contacts themselves are NOT wiped,
+  // just reloaded so their cached secrets get recomputed against new_id.
+  resetContacts();
+  _store->loadContacts(this);
+  return true;
+}
+
 struct FreqRange {
   uint32_t lower_freq, upper_freq;
 };

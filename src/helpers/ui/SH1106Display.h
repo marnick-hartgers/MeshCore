@@ -27,6 +27,7 @@ public:
   bool begin();
 
   bool isOn() override { return _isOn; }
+  bool supportsColor() override { return false; }   // single-bit OLED buffer
   void turnOn() override;
   void turnOff() override;
   void clear() override;

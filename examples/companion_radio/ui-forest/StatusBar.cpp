@@ -11,13 +11,14 @@
 #endif
 
 StatusBar::StatusBar() : _text_width(0), _scroll_x(0), _display_width(72),
-                          _next_scroll(0), _needs_redraw(true),
+                          _next_scroll(0), _needs_redraw(true), _is_eink(false),
                           _batt_mv(0), _muted(false), _batt_dirty(true) {
   _text[0] = 0;
 }
 
-void StatusBar::begin(int display_width) {
+void StatusBar::begin(int display_width, bool is_eink) {
   _display_width = display_width;
+  _is_eink = is_eink;
   _scroll_x = 0;
   _next_scroll = 0;
 }
@@ -42,7 +43,7 @@ void StatusBar::setBattery(uint16_t milliVolts, bool muted) {
 
 bool StatusBar::needsRedraw() const {
   if (_batt_dirty) return true;
-  if (_text_width <= _display_width) return _needs_redraw;  // static, no scrolling
+  if (_is_eink || _text_width <= _display_width) return _needs_redraw;  // static, no scrolling
   return millis() >= _next_scroll;
 }
 
@@ -55,6 +56,18 @@ void StatusBar::renderBattery(DisplayDriver& display) {
   int iconHeight = 8;
   int iconX = display.width() - iconWidth - 4;
   int iconY = 1;
+
+  // The battery gauge is drawn last specifically so the scrolling text never
+  // paints over it -- but the gauge itself is only an outline + partial fill
+  // + optional muted glyph, not a solid opaque block, so without clearing its
+  // bounding box first, any marquee text pixels that land inside that box but
+  // outside the gauge's own lit segments show through underneath it (reported
+  // as "text mixed into the battery icon"). Clear the full box -- gauge plus
+  // the muted-icon slot to its left -- before drawing anything on top of it.
+  int clearX = iconX - 9;
+  display.setColor(DisplayDriver::DARK);
+  display.fillRect(clearX, 0, display.width() - clearX, iconHeight + 2);
+
   display.setColor(DisplayDriver::GREEN);
 
   display.drawRect(iconX, iconY, iconWidth, iconHeight);              // battery outline
@@ -76,7 +89,12 @@ void StatusBar::render(DisplayDriver& display) {
     display.setTextSize(1);
     display.setColor(DisplayDriver::GREEN);
 
-    if (_text_width <= _display_width) {
+    if (_is_eink) {
+      // No marquee on e-ink (PLAN.md 3.3) -- show the truncated/static form,
+      // even if the full text would have scrolled on a non-eink display.
+      display.drawTextEllipsized(0, 0, _display_width, _text);
+      _needs_redraw = false;
+    } else if (_text_width <= _display_width) {
       display.setCursor(0, 0);
       display.print(_text);
       _needs_redraw = false;

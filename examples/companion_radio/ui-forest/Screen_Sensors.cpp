@@ -97,7 +97,7 @@ int Screen_Sensors::render(DisplayDriver& display) {
     display.print(name);
     display.setCursor(display.width() - display.getTextWidth(buf) - 1, y);
     display.print(buf);
-    y += 12;
+    y += Layout::rowHeight() + 1;
   }
 
   if (sensors_scroll) sensors_scroll_offset = (sensors_scroll_offset + 1) % sensors_nb;

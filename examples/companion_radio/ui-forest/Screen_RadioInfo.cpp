@@ -13,17 +13,17 @@ int Screen_RadioInfo::render(DisplayDriver& display) {
   display.setCursor(0, y);
   sprintf(tmp, "FQ: %06.3f   SF: %d", _node_prefs->freq, _node_prefs->sf);
   display.print(tmp);
-  y += 11;
+  y += Layout::rowHeight();
 
   display.setCursor(0, y);
   sprintf(tmp, "BW: %03.2f     CR: %d", _node_prefs->bw, _node_prefs->cr);
   display.print(tmp);
-  y += 11;
+  y += Layout::rowHeight();
 
   display.setCursor(0, y);
   sprintf(tmp, "TX: %ddBm", _node_prefs->tx_power_dbm);
   display.print(tmp);
-  y += 11;
+  y += Layout::rowHeight();
 
   display.setCursor(0, y);
   sprintf(tmp, "Noise floor: %d", radio_driver.getNoiseFloor());

@@ -39,7 +39,7 @@ void UITask::begin(DisplayDriver* display, SensorManager* sensors, NodePrefs* no
 
   if (_display != NULL) {
     _display->turnOn();
-    _status_bar.begin(_display->width());
+    _status_bar.begin(_display->width(), _display->isEink());
   }
 
   ui_started_at = millis();
@@ -53,6 +53,25 @@ void UITask::begin(DisplayDriver* display, SensorManager* sensors, NodePrefs* no
   _radio_info = new Screen_RadioInfo(_nav, node_prefs);
   _bluetooth = new Screen_Bluetooth(_nav, this);
   _advert = new Screen_Advert(_nav, _toast, this);
+  _contact_detail = new Screen_ContactDetail(_nav);
+  _contacts = new Screen_Contacts(_nav, _contact_detail);
+  _channels = new Screen_Channels(_nav);
+  // Phase 3: sub-screens constructed before the root Screen_Settings, which
+  // needs pointers to all five (same "leaf screens first" ordering _home
+  // itself already follows).
+  _settings_radio = new Screen_SettingsRadio(_nav, _toast, _confirm, node_prefs, _stepper_field, _enum_field, _event_log);
+  _settings_advert = new Screen_SettingsAdvert(_nav, _toast, _confirm, node_prefs, _text_field, _toggle_field);
+  _settings_network = new Screen_SettingsNetwork(_nav, _toast, _confirm, node_prefs, _toggle_field, _enum_field, _stepper_field);
+  _settings_device = new Screen_SettingsDevice(_nav, _toast, _confirm, this, _toggle_field);
+  _settings_danger = new Screen_SettingsDanger(_nav, _toast, _confirm, this);
+  _settings = new Screen_Settings(_nav, _toast, _settings_radio, _settings_advert, _settings_network, _settings_device, _settings_danger);
+  // Phase 4: sub-screens before the root Screen_Diagnostics, same "leaf
+  // screens first" ordering as Settings above.
+  _diag_radio = new Screen_DiagRadio(_nav);
+  _diag_packets = new Screen_DiagPackets(_nav);
+  _diag_core = new Screen_DiagCore(_nav);
+  _event_log_screen = new Screen_EventLog(_nav, _event_log);
+  _diagnostics = new Screen_Diagnostics(_nav, _toast, _diag_radio, _diag_packets, _diag_core, _event_log_screen);
 #if ENV_INCLUDE_GPS == 1
   _gps = new Screen_Gps(_nav, this);
 #endif
@@ -102,6 +121,22 @@ void UITask::begin(DisplayDriver* display, SensorManager* sensors, NodePrefs* no
   _home_items[i].submenu = _advert;
   i++;
 
+  _home_items[i].label = "Contacts";
+  _home_items[i].icon = NULL;
+  _home_items[i].kind = MenuItemKind::Submenu;
+  _home_items[i].action = NULL;
+  _home_items[i].action_ctx = NULL;
+  _home_items[i].submenu = _contacts;
+  i++;
+
+  _home_items[i].label = "Channels";
+  _home_items[i].icon = NULL;
+  _home_items[i].kind = MenuItemKind::Submenu;
+  _home_items[i].action = NULL;
+  _home_items[i].action_ctx = NULL;
+  _home_items[i].submenu = _channels;
+  i++;
+
 #if ENV_INCLUDE_GPS == 1
   _home_items[i].label = "GPS";
   _home_items[i].icon = NULL;
@@ -121,6 +156,22 @@ void UITask::begin(DisplayDriver* display, SensorManager* sensors, NodePrefs* no
   _home_items[i].submenu = _sensors_screen;
   i++;
 #endif
+
+  _home_items[i].label = "Diagnostics";
+  _home_items[i].icon = NULL;
+  _home_items[i].kind = MenuItemKind::Submenu;
+  _home_items[i].action = NULL;
+  _home_items[i].action_ctx = NULL;
+  _home_items[i].submenu = _diagnostics;
+  i++;
+
+  _home_items[i].label = "Settings";
+  _home_items[i].icon = NULL;
+  _home_items[i].kind = MenuItemKind::Submenu;
+  _home_items[i].action = NULL;
+  _home_items[i].action_ctx = NULL;
+  _home_items[i].submenu = _settings;
+  i++;
 
   _home_items[i].label = "Shutdown";
   _home_items[i].icon = NULL;
@@ -189,6 +240,34 @@ void UITask::notify(UIEventType t) {
     vibration.trigger();
   }
 #endif
+
+  // Phase 4: this is the one call site MyMesh already routes contact/channel/
+  // room messages, acks, and new-contact-message notice through (MyMesh.cpp),
+  // so it doubles as the diagnostic event log's feed -- no new Mesh/MyMesh
+  // callback plumbing added (phase-4-diagnostics.md step 7's explicit
+  // constraint).
+  switch (t) {
+    case UIEventType::contactMessage:
+      logEvent("Message received");
+      break;
+    case UIEventType::channelMessage:
+      logEvent("Channel message received");
+      break;
+    case UIEventType::roomMessage:
+      logEvent("Room message received");
+      break;
+    case UIEventType::newContactMessage:
+      logEvent("New contact message");
+      break;
+    case UIEventType::ack:
+      // Ack is also used for GPS/buzzer-toggle confirmation tones (see
+      // toggleGPS()/toggleBuzzer() below), not just message acks -- too noisy
+      // and not mesh-diagnostic in nature to log every occurrence.
+      break;
+    case UIEventType::none:
+    default:
+      break;
+  }
 }
 
 void UITask::userLedHandler() {
@@ -212,17 +291,36 @@ void UITask::userLedHandler() {
 #endif
 }
 
+// Drops every byte that's part of a multi-byte UTF-8 sequence (emoji, accented
+// characters, etc.) instead of substituting a placeholder glyph the way
+// DisplayDriver::translateUTF8ToBlocks() does for Contacts/Recents/message
+// text -- in the status bar's single scrolling line, a run of block
+// characters for a multi-codepoint emoji reads as clutter, so a user-chosen
+// node name containing one should just have it removed, not replaced.
+static void stripNonAscii(char* dest, const char* src, size_t dest_size) {
+  size_t j = 0;
+  for (size_t i = 0; src[i] != 0 && j < dest_size - 1; i++) {
+    unsigned char c = (unsigned char)src[i];
+    if (c < 0x80) dest[j++] = (char)c;   // ASCII byte -- keep
+    // else: continuation/lead byte of a multi-byte UTF-8 sequence -- drop it
+  }
+  dest[j] = 0;
+}
+
 void UITask::updateStatusBar() {
   if (_display == NULL) return;
+
+  char name_buf[sizeof(_node_prefs->node_name)];
+  stripNonAscii(name_buf, _node_prefs->node_name, sizeof(name_buf));
 
   char buf[160];
   snprintf(buf, sizeof(buf),
     "%s" STATUS_BAR_SEPARATOR
     "BUZ:%s" STATUS_BAR_SEPARATOR
     "GPS:%s" STATUS_BAR_SEPARATOR
-    "BLE:%s"
+    UI_FOREST_TRANSPORT_NAME ":%s"
     " - ",   // trailing gap before the text loops
-    _node_prefs->node_name,
+    name_buf,
     isBuzzerQuiet() ? "OFF" : "ON",
     getGPSState() ? "ON" : "OFF",
     isSerialEnabled() ? "ON" : "OFF"
@@ -251,6 +349,16 @@ void UITask::shutdown(bool restart) {
 
 void UITask::loop() {
   char c = _input.poll(*this);
+
+  // KEY_HOME (jump-to-root) is handled once here, centrally, rather than by
+  // individual screens (PLAN.md 3.1/Phase 2 item 16) -- see handleTripleClick()
+  // for where it's emitted.
+  if (c == KEY_HOME) {
+    _nav.popToRoot();
+    c = 0;
+    _auto_off = millis() + AUTO_OFF_MILLIS;
+    _next_refresh = 100;
+  }
 
   if (c != 0 && _nav.current()) {
     _nav.current()->handleInput(c);
@@ -282,7 +390,16 @@ void UITask::loop() {
       int delay_millis = 1000;
       if (curr) delay_millis = curr->render(*_display);
 
-      if (status_due) _status_bar.render(*_display);
+      // startFrame() always wipes the whole buffer (every DisplayDriver
+      // backend does a full clear/fill there, not a partial update), so the
+      // status bar must be redrawn on every pass through this block, not just
+      // the ones status_due itself triggered -- otherwise a content-only
+      // refresh (or a toast-only one) wipes it and leaves it blank for that
+      // frame, which reads as a flash/flicker of the status bar (real-device
+      // finding, Phase 4). status_due still gates whether this block runs at
+      // all; it just isn't the gate for whether the status bar draws once
+      // we're already redrawing for some other reason.
+      if (!showing_splash) _status_bar.render(*_display);
       _toast.composite(*_display);
 
       _display->endFrame();
@@ -314,6 +431,7 @@ void UITask::loop() {
     uint16_t milliVolts = getBattMilliVolts();
     if (milliVolts > 0 && milliVolts < AUTO_SHUTDOWN_MILLIVOLTS) {
       if (!_board->isExternalPowered()) {
+        logEvent("Low battery: shutting down");
         if (_display != NULL) {
           _display->startFrame();
           _display->setTextSize(2);
@@ -360,9 +478,17 @@ char UITask::handleDoubleClick(char c) {
 char UITask::handleTripleClick(char c) {
   MESH_DEBUG_PRINTLN("UITask: triple click triggered");
   checkDisplayOn(c);
+
+  // Phase 2: below Home, this gesture (the only "extra" one single-button/
+  // analog/rotary boards have spare -- see ARCHITECTURE.md) becomes the
+  // long-press-anywhere-equivalent KEY_HOME jump-to-root (PLAN.md 3.1,
+  // item 16). At Home itself there's nothing to jump home from, so it keeps
+  // ui-new's original always-mute behavior there.
+  if (_nav.depth() > 1) {
+    return KEY_HOME;
+  }
   toggleBuzzer();
-  c = 0;
-  return c;
+  return 0;
 }
 
 bool UITask::getGPSState() {
