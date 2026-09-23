@@ -58,10 +58,10 @@ bool ToggleField::handleInput(char c) {
 void StepperField::begin(const char* title, const char* unit, StepperGetFn get, StepperSetFn set, void* ctx,
                           float min, float max, float step, int decimals) {
   _title = title; _unit = unit; _get = get; _set = set; _ctx = ctx;
-  _min = min; _max = max; _step = step; _decimals = decimals;
+  _min_val = min; _max_val = max; _step = step; _decimals = decimals;
   _pending = _get ? _get(_ctx) : min;
-  if (_pending < _min) _pending = _min;
-  if (_pending > _max) _pending = _max;
+  if (_pending < _min_val) _pending = _min_val;
+  if (_pending > _max_val) _pending = _max_val;
 }
 
 int StepperField::render(DisplayDriver& display) {
@@ -115,12 +115,12 @@ bool StepperField::handleInput(char c) {
   }
   if (c == KEY_NEXT || c == KEY_DOWN || c == KEY_RIGHT) {
     _pending += _step;
-    if (_pending > _max) _pending = _max;
+    if (_pending > _max_val) _pending = _max_val;
     return true;
   }
   if (c == KEY_PREV || c == KEY_UP || c == KEY_LEFT) {
     _pending -= _step;
-    if (_pending < _min) _pending = _min;
+    if (_pending < _min_val) _pending = _min_val;
     return true;
   }
   if (c == KEY_ENTER || c == KEY_SELECT) {

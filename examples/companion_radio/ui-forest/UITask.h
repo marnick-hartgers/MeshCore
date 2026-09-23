@@ -25,16 +25,13 @@
 #include "InputRouter.h"
 #include "ToastOverlay.h"
 #include "StatusBar.h"
-#include "MenuScreen.h"
 #include "ConfirmScreen.h"
 #include "FormField.h"
 #include "EventLog.h"
 #include "NotificationPrefs.h"
 #include "Transport.h"
 #include "Screen_Splash.h"
-#include "Screen_Status.h"
 #include "Screen_Recents.h"
-#include "Screen_RadioInfo.h"
 #include "Screen_Bluetooth.h"
 #include "Screen_Advert.h"
 #include "Screen_Contacts.h"
@@ -61,20 +58,7 @@
 #endif
 #include "Screen_Shutdown.h"
 #include "Screen_MsgPreview.h"
-
-// Number of real top-level Home entries. GPS/Sensors entries are
-// conditionally compiled in, so the count/array is sized for the worst case
-// (all optional screens present) and only the first `_home_item_count` slots
-// are used. Bumped from 10 to 11 in Phase 3 for "Settings"; bumped to 12 in
-// Phase 4 for "Diagnostics" -- phase-4-diagnostics.md's own stated
-// prerequisite (that Phase 3 already added this slot as a placeholder) didn't
-// hold (see PROGRESS.md/ARCHITECTURE.md), so this phase adds the Home entry
-// and its real content in one step instead of two. Bumped to 13 in Phase 7 for
-// "Recent Events" -- deliberately a distinct Home entry from the existing
-// "Recent" (Screen_Recents, Phase 1: recently-heard adverts/nodes) rather than
-// reusing that name, since the two screens show unrelated content (mesh nodes
-// heard vs. this phase's user-facing notification history).
-#define UI_FOREST_HOME_ITEM_COUNT 13
+#include "Screen_HomeDashboard.h"
 
 // Entry point -- same public contract main.cpp already expects from
 // ui-new/ui-tiny (construct with board+serial, begin(display, sensors,
@@ -129,10 +113,8 @@ class UITask : public AbstractUITask {
   NotificationPrefs _notify_prefs;
 
   Screen_Splash* _splash;
-  MenuScreen* _home;
-  Screen_Status* _status;
+  Screen_HomeDashboard* _home;
   Screen_Recents* _recents;
-  Screen_RadioInfo* _radio_info;
   Screen_Bluetooth* _bluetooth;
   Screen_Advert* _advert;
   Screen_ContactDetail* _contact_detail;
@@ -160,9 +142,6 @@ class UITask : public AbstractUITask {
   Screen_Shutdown* _shutdown_screen;
   Screen_MsgPreview* _msg_preview;
 
-  MenuItem _home_items[UI_FOREST_HOME_ITEM_COUNT];
-  int _home_item_count;
-
   unsigned long _next_refresh, _auto_off;
   unsigned long ui_started_at, next_batt_chck;
 #ifdef PIN_STATUS_LED
@@ -180,7 +159,7 @@ public:
     : AbstractUITask(board, serial), _display(NULL), _sensors(NULL), _node_prefs(NULL),
       _confirm(_nav),   // declared after _nav, so this is safe to init here (see .h field order)
       _toggle_field(_nav), _stepper_field(_nav), _enum_field(_nav), _text_field(_nav),
-      _splash(NULL), _home(NULL), _status(NULL), _recents(NULL), _radio_info(NULL),
+      _splash(NULL), _home(NULL), _recents(NULL),
       _bluetooth(NULL), _advert(NULL),
       _contact_detail(NULL), _contacts(NULL), _channels(NULL),
       _settings_radio(NULL), _settings_advert(NULL), _settings_network(NULL),
@@ -193,7 +172,7 @@ public:
 #if UI_SENSORS_PAGE == 1
       _sensors_screen(NULL),
 #endif
-      _shutdown_screen(NULL), _msg_preview(NULL), _home_item_count(0),
+      _shutdown_screen(NULL), _msg_preview(NULL),
       _next_refresh(0), _auto_off(0), ui_started_at(0), next_batt_chck(0), _msgcount(0) { }
 
   void begin(DisplayDriver* display, SensorManager* sensors, NodePrefs* node_prefs);
@@ -202,6 +181,12 @@ public:
   int  getMsgCount() const { return _msgcount; }
   bool hasDisplay() const { return _display != NULL; }
   bool isDisplayOn() const { return _display != NULL && _display->isOn(); }
+
+  // Phase 3 (home dashboard): Screen_HomeDashboard's caption line needs the
+  // device name, same as the old status bar marquee used to show -- _node_prefs
+  // is private to UITask, so this is the same thin-passthrough shape as
+  // isDisplayOn()/getTouch() above.
+  const char* getNodeName() const { return _node_prefs->node_name; }
 
   // Phase 6 (item 33): InputRouter's only way to reach the touch-capable
   // DisplayDriver -- _display is private to UITask, so this mirrors the
@@ -237,6 +222,14 @@ public:
   void toggleBuzzer();
   bool getGPSState();
   void toggleGPS();
+
+  // Phase 2 (home dashboard): combine the on/off setting above with the real
+  // fix/connection signals that were never reaching StatusBar before. Screen_
+  // HomeDashboard (Phase 3) calls these same two methods for its GPS/link
+  // tiles rather than re-deriving GpsState/LinkState itself, so the mapping
+  // only lives in one place.
+  GpsState getGpsFixState();
+  LinkState getLinkState();
 
   // Called from InputRouter -- these mirror ui-new's UITask methods of the
   // same name (examples/companion_radio/ui-new/UITask.cpp:862-894), just

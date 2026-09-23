@@ -1,6 +1,8 @@
 #include "StatusBar.h"
 #include "icons.h"
+#include "Layout.h"
 #include <Arduino.h>
+#include <stdio.h>
 #include <string.h>
 
 #ifndef BATT_MIN_MILLIVOLTS
@@ -10,28 +12,43 @@
   #define BATT_MAX_MILLIVOLTS 4200
 #endif
 
-StatusBar::StatusBar() : _text_width(0), _scroll_x(0), _display_width(72),
-                          _next_scroll(0), _needs_redraw(true), _is_eink(false),
-                          _batt_mv(0), _muted(false), _batt_dirty(true) {
-  _text[0] = 0;
+// Phase 5: how long the unread badge stays inverted after a message arrives
+// while connected (design-4-icon-tiles.md-adjacent plan.md §4's "1-2s
+// invert/flash" proposal).
+#define UNREAD_FLASH_MILLIS 1500
+
+StatusBar::StatusBar() : _gps(GpsState::Off), _link(LinkState::Off), _buzzer_on(false),
+                          _unread(0), _dirty(true), _unread_flash_until(0),
+                          _batt_mv(0), _muted(false), _batt_dirty(true) { }
+
+void StatusBar::begin() { }
+
+void StatusBar::setGpsState(GpsState s) {
+  if (s == _gps) return;
+  _gps = s;
+  _dirty = true;
 }
 
-void StatusBar::begin(int display_width, bool is_eink) {
-  _display_width = display_width;
-  _is_eink = is_eink;
-  _scroll_x = 0;
-  _next_scroll = 0;
+void StatusBar::setLinkState(LinkState s) {
+  if (s == _link) return;
+  _link = s;
+  _dirty = true;
 }
 
-void StatusBar::setText(DisplayDriver& display, const char* text) {
-  if (strcmp(text, _text) == 0) return;  // unchanged, skip rebuild
+void StatusBar::setBuzzer(bool on) {
+  if (on == _buzzer_on) return;
+  _buzzer_on = on;
+  _dirty = true;
+}
 
-  strncpy(_text, text, sizeof(_text) - 1);
-  _text[sizeof(_text) - 1] = 0;
+void StatusBar::setUnreadCount(int count) {
+  if (count == _unread) return;
+  _unread = count;
+  _dirty = true;
+}
 
-  display.setTextSize(1);
-  _text_width = display.getTextWidth(_text);
-  _needs_redraw = true;
+void StatusBar::flashUnread() {
+  _unread_flash_until = millis() + UNREAD_FLASH_MILLIS;
 }
 
 void StatusBar::setBattery(uint16_t milliVolts, bool muted) {
@@ -42,9 +59,11 @@ void StatusBar::setBattery(uint16_t milliVolts, bool muted) {
 }
 
 bool StatusBar::needsRedraw() const {
-  if (_batt_dirty) return true;
-  if (_is_eink || _text_width <= _display_width) return _needs_redraw;  // static, no scrolling
-  return millis() >= _next_scroll;
+  // While the flash window is active, keep redrawing every pass so the
+  // un-invert frame fires the instant it expires, not whenever something
+  // else next happens to trigger a redraw.
+  if (millis() < _unread_flash_until) return true;
+  return _dirty || _batt_dirty;
 }
 
 void StatusBar::renderBattery(DisplayDriver& display) {
@@ -57,13 +76,14 @@ void StatusBar::renderBattery(DisplayDriver& display) {
   int iconX = display.width() - iconWidth - 4;
   int iconY = 1;
 
-  // The battery gauge is drawn last specifically so the scrolling text never
-  // paints over it -- but the gauge itself is only an outline + partial fill
-  // + optional muted glyph, not a solid opaque block, so without clearing its
-  // bounding box first, any marquee text pixels that land inside that box but
-  // outside the gauge's own lit segments show through underneath it (reported
-  // as "text mixed into the battery icon"). Clear the full box -- gauge plus
-  // the muted-icon slot to its left -- before drawing anything on top of it.
+  // The battery gauge is drawn last specifically so nothing else in the bar
+  // paints over it -- but the gauge itself is only an outline + partial fill,
+  // not a solid opaque block, so without clearing its bounding box first, any
+  // stray pixels drawn earlier this frame that land inside that box but
+  // outside the gauge's own lit segments would show through underneath it
+  // (this is what the pre-Phase-2 marquee text used to do, reported as "text
+  // mixed into the battery icon"). Clear the gauge's own footprint before
+  // drawing anything on top of it.
   int clearX = iconX - 9;
   display.setColor(DisplayDriver::DARK);
   display.fillRect(clearX, 0, display.width() - clearX, iconHeight + 2);
@@ -75,48 +95,57 @@ void StatusBar::renderBattery(DisplayDriver& display) {
 
   int fillWidth = (batteryPercentage * (iconWidth - 4)) / 100;
   display.fillRect(iconX + 2, iconY + 2, fillWidth, iconHeight - 4);
-
-#ifdef PIN_BUZZER
-  if (_muted) {
-    display.setColor(DisplayDriver::RED);
-    display.drawXbm(iconX - 9, iconY, muted_icon, 8, 8);
-  }
-#endif
 }
 
 void StatusBar::render(DisplayDriver& display) {
-  if (_text[0] != 0) {
-    display.setTextSize(1);
-    display.setColor(DisplayDriver::GREEN);
+  display.setColor(DisplayDriver::LIGHT);
 
-    if (_is_eink) {
-      // No marquee on e-ink (PLAN.md 3.3) -- show the truncated/static form,
-      // even if the full text would have scrolled on a non-eink display.
-      display.drawTextEllipsized(0, 0, _display_width, _text);
-      _needs_redraw = false;
-    } else if (_text_width <= _display_width) {
-      display.setCursor(0, 0);
-      display.print(_text);
-      _needs_redraw = false;
-    } else {
-      int x = _scroll_x;
-      do {
-        display.setCursor(x, 0);
-        display.print(_text);
-        x += _text_width;
-      } while (x < _display_width);
-
-      _scroll_x--;
-      if (_scroll_x <= -_text_width) _scroll_x = 0;
-
-      _next_scroll = millis() + STATUS_BAR_SCROLL_MS;
-      _needs_redraw = false;
-    }
-  } else {
-    _needs_redraw = false;
+  int x = 0;
+  display.drawXbm(x, 1, gps_status_icons_8[(int)_gps], 8, 8);
+  x += 9;
+  display.drawXbm(x, 1, link_status_icons_8[(int)_link], 8, 8);
+  x += 9;
+#ifdef PIN_BUZZER
+  // Boards with no buzzer hardware have isBuzzerQuiet() report true
+  // unconditionally (UITask::isBuzzerQuiet()), so this slot is skipped
+  // entirely there rather than showing a permanently-muted icon -- same
+  // reasoning Phase 1's battery-gauge overlay already applied. The slot
+  // itself stays reserved (x still advances) so the icons after it don't
+  // shift position per-board.
+  display.drawXbm(x, 1, _buzzer_on ? buzzer_on_8 : muted_icon, 8, 8);
+#endif
+  x += 9;
+  display.setTextSize(1);
+  char count_buf[4] = "";
+  if (_unread > 0) {
+    if (_unread > 9) strcpy(count_buf, "9+");
+    else snprintf(count_buf, sizeof(count_buf), "%d", _unread);
   }
 
-  // drawn last so the scrolling text never paints over it
+  // Phase 5 (ambient notification blink): while the flash window is active,
+  // invert the badge (icon + count) -- the same fillRect-then-contrasting-
+  // color trick used everywhere else in this codebase for "highlighted"
+  // (MenuScreen's selected row, Screen_HomeDashboard's focused tile), no new
+  // drawing primitive needed.
+  bool flashing = millis() < _unread_flash_until;
+  int badge_w = 9 + (count_buf[0] ? display.getTextWidth(count_buf) : 0);
+  if (flashing) {
+    display.setColor(Layout::accentColor(display, DisplayDriver::LIGHT));
+    display.fillRect(x, 0, badge_w, 10);
+    display.setColor(DisplayDriver::DARK);
+  } else {
+    display.setColor(DisplayDriver::LIGHT);
+  }
+  display.drawXbm(x, 1, unread_envelope_8, 8, 8);
+  x += 9;
+  if (count_buf[0]) {
+    display.setCursor(x, 1);
+    display.print(count_buf);
+  }
+
+  _dirty = false;
+
+  // drawn last so nothing else in the bar paints over it
   renderBattery(display);
   _batt_dirty = false;
 }

@@ -180,16 +180,28 @@ static const uint8_t channel_icon[] = {
   0x0C, 0x30, 0x0C, 0x30, 0x00, 0x00, 0x00, 0x00,
 };
 
-// 16x16 -- filled/outline diamond pair for GPS fix / no-fix state.
-static const uint8_t gps_fix_icon[] = {
-  0x01, 0x80, 0x03, 0xC0, 0x07, 0xE0, 0x0F, 0xF0, 0x1F, 0xF8, 0x3F, 0xFC,
-  0x7F, 0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0x7F, 0xFE, 0x3F, 0xFC, 0x1F, 0xF8,
-  0x0F, 0xF0, 0x07, 0xE0, 0x03, 0xC0, 0x01, 0x80,
+// 16x16 -- GPS Home-tile icons (home-dashboard phase): a clean 2x scale-up of
+// the status bar's gps_fix_8/gps_nofix_8 dropper glyphs, not the original
+// diamond pair this file used to define here -- the diamond was never wired
+// into any screen (grepped before replacing it), and once the status bar
+// switched to a dropper, keeping the diamond for the Home tile of the exact
+// same GPS-fix state would show two different shapes for one state on the
+// same screen. gps_off_icon is new (nothing existed for the 16x16 "off" tile
+// state before this).
+static const uint8_t gps_off_icon[] = {
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 };
 static const uint8_t gps_nofix_icon[] = {
-  0x01, 0x80, 0x02, 0x40, 0x04, 0x20, 0x08, 0x10, 0x10, 0x08, 0x20, 0x04,
-  0x40, 0x02, 0x80, 0x01, 0x80, 0x01, 0x40, 0x02, 0x20, 0x04, 0x10, 0x08,
-  0x08, 0x10, 0x04, 0x20, 0x02, 0x40, 0x01, 0x80,
+  0x03, 0xC0, 0x03, 0xC0, 0x0C, 0x30, 0x0C, 0x30, 0x33, 0xCC, 0x33, 0xCC,
+  0x33, 0xCC, 0x33, 0xCC, 0x30, 0x0C, 0x30, 0x0C, 0x0C, 0x30, 0x0C, 0x30,
+  0x0C, 0x30, 0x0C, 0x30, 0x03, 0xC0, 0x03, 0xC0,
+};
+static const uint8_t gps_fix_icon[] = {
+  0x03, 0xC0, 0x03, 0xC0, 0x0F, 0xF0, 0x0F, 0xF0, 0x3C, 0x3C, 0x3C, 0x3C,
+  0x3C, 0x3C, 0x3C, 0x3C, 0x3F, 0xFC, 0x3F, 0xFC, 0x0F, 0xF0, 0x0F, 0xF0,
+  0x0F, 0xF0, 0x0F, 0xF0, 0x03, 0xC0, 0x03, 0xC0,
 };
 
 // 16x16 x5 -- signal-strength bar icons, 0..4 bars lit out of 4 (PLAN.md 3.5's
@@ -251,4 +263,113 @@ static const uint8_t torch_icon[] = {
   0x00, 0x0F, 0xF0, 0x00, 0x00, 0x0F, 0xF0, 0x00, 0x00, 0x0F, 0xF0, 0x00,
   0x00, 0x0F, 0xF0, 0x00, 0x00, 0x0F, 0xF0, 0x00, 0x00, 0x0F, 0xF0, 0x00,
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+};
+
+// ---------------------------------------------------------------------------
+// Phase 6 (home dashboard, phases/home-dashboard/implementation-plan.md
+// Phase 1) -- new icon assets for the status bar's fixed icon slots (8x8,
+// matching muted_icon's existing scale) and the home dashboard's 8-tile grid
+// (16x16, matching gps_fix_icon/contact_icon/etc's existing scale). Same
+// hand-authored convention as every icon above: row-major, MSB-first bytes,
+// no runtime decoding, derived from an explicit column-set-per-row
+// description (documented per icon below) rather than eyeballed, so the byte
+// values can be checked against the stated intent without a compiler.
+
+// 8x8 -- GPS status-bar indicator, 3 states: a map-pin/dropper glyph (round
+// head + hole, tapering to a point at the bottom), not a diamond -- picked
+// over the diamond after a design review pass. "Off" is no dropper at all
+// (blank); "no fix" is the dropper traced as a double outline (outer
+// silhouette plus the hole's own boundary, so the hole reads as a hole even
+// though nothing is filled); "fix" is the same silhouette filled solid with a
+// real unlit 2x2 hole punched through it. Confirmed against a rendered
+// ASCII-art proof before committing the bytes.
+//
+// gps_off_8: nothing drawn.
+static const uint8_t gps_off_8[] = {
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+};
+// gps_nofix_8: outer outline + inner hole-boundary outline, both hollow.
+static const uint8_t gps_nofix_8[] = {
+  0x18, 0x24, 0x5A, 0x5A, 0x42, 0x24, 0x24, 0x18,
+};
+// gps_fix_8: same silhouette, filled solid except a real 2x2 unlit hole.
+static const uint8_t gps_fix_8[] = {
+  0x18, 0x3C, 0x66, 0x66, 0x7E, 0x3C, 0x3C, 0x18,
+};
+// Convenience lookup indexed by StatusBar::GpsState (Off=0, NoFix=1, Fixed=2).
+static const uint8_t* const gps_status_icons_8[3] = {
+  gps_off_8, gps_nofix_8, gps_fix_8,
+};
+
+// 8x8 -- transport/link status-bar indicator, 3 states. Generic link/plug
+// glyph (not Bluetooth-specific) per plan.md's decision to use one icon for
+// every transport (BLE/USB/WiFi/Ethernet).
+//
+// link_off_8: minimal center dash -- transport disabled, nothing to show.
+static const uint8_t link_off_8[] = {
+  0x00, 0x00, 0x00, 0x18, 0x18, 0x00, 0x00, 0x00,
+};
+// link_disconnected_8: two separate hollow rings (3x4 each) with a gap
+// between them -- transport enabled but not linked to anything.
+static const uint8_t link_disconnected_8[] = {
+  0x00, 0x00, 0xE7, 0xA5, 0xA5, 0xE7, 0x00, 0x00,
+};
+// link_connected_8: the same two rings joined into one unbroken chain --
+// transport enabled and a client is connected.
+static const uint8_t link_connected_8[] = {
+  0x00, 0x00, 0xFF, 0x99, 0x99, 0xFF, 0x00, 0x00,
+};
+// Convenience lookup indexed by StatusBar::LinkState (Off=0, Disconnected=1,
+// Connected=2).
+static const uint8_t* const link_status_icons_8[3] = {
+  link_off_8, link_disconnected_8, link_connected_8,
+};
+
+// 8x8 -- buzzer status-bar indicator, "on" state (speaker cone + two parallel
+// sound-wave bars of increasing height). The "off" state keeps reusing the
+// existing muted_icon above (speaker cone + a crossing "X") -- no new asset
+// needed there, only "on" was missing. Deliberately two parallel bars rather
+// than muted_icon's crossing X, so the two states stay visually distinct even
+// though they share the same speaker-cone silhouette.
+static const uint8_t buzzer_on_8[] = {
+  0x20, 0x62, 0xEA, 0xEA, 0xEA, 0xEA, 0x62, 0x20,
+};
+
+// 8x8 -- unread-message indicator: a simple envelope (rectangle + V-shaped
+// flap crease), drawn next to a digit count in the status bar.
+static const uint8_t unread_envelope_8[] = {
+  0x00, 0xFF, 0xC3, 0xA5, 0x99, 0x81, 0xFF, 0x00,
+};
+
+// 16x16 -- Buzzer tile icons for the home dashboard (Phase 3). NOTE: the
+// existing 8x8 muted_icon can't be reused here despite implementation-plan.md
+// Phase 3.4 naming it for the tile's "off" state -- every dashboard tile icon
+// is drawn at 16x16 (Phase 3.2's renderTile()), and drawXbm(..., 16, 16) on
+// muted_icon's 8-byte array would read 24 bytes past its end. These two are
+// 2x nearest-neighbor scale-ups of muted_icon's/buzzer_on_8's cone-plus-mark
+// shape (same cone silhouette, same X-vs-parallel-bars distinction), not a
+// new design, so they stay visually consistent with the status-bar icons
+// above at tile scale.
+static const uint8_t buzzer_off_icon[] = {
+  0x0C, 0x00, 0x0C, 0x00, 0x3C, 0xCC, 0x3C, 0xCC, 0xFC, 0xCC, 0xFC, 0xCC,
+  0xFC, 0x30, 0xFC, 0x30, 0xFC, 0x30, 0xFC, 0x30, 0xFC, 0xCC, 0xFC, 0xCC,
+  0x3C, 0xCC, 0x3C, 0xCC, 0x0C, 0x00, 0x0C, 0x00,
+};
+static const uint8_t buzzer_on_icon[] = {
+  0x0C, 0x00, 0x0C, 0x00, 0x3C, 0x0C, 0x3C, 0x0C, 0xFC, 0xCC, 0xFC, 0xCC,
+  0xFC, 0xCC, 0xFC, 0xCC, 0xFC, 0xCC, 0xFC, 0xCC, 0xFC, 0xCC, 0xFC, 0xCC,
+  0x3C, 0x0C, 0x3C, 0x0C, 0x0C, 0x00, 0x0C, 0x00,
+};
+
+// 16x16 -- Advert tile icon for the home dashboard: a "broadcast" glyph, 3
+// concentric diamonds (filled center dot + 2 hollow rings) radiating outward
+// -- a diamond-outline construction (unrelated to gps_fix_icon/gps_nofix_icon
+// above, which moved to a dropper shape), and a fresh redraw at tile scale
+// rather than a scaled-down copy of the existing 32x32 advert_icon (which is
+// a different, more detailed motif meant for a full-screen glyph, not a
+// 16x16 row icon).
+static const uint8_t advert_icon_16[] = {
+  0x01, 0x80, 0x02, 0x40, 0x04, 0x20, 0x08, 0x10, 0x11, 0x88, 0x22, 0x44,
+  0x45, 0xA2, 0x8B, 0xD1, 0x8B, 0xD1, 0x45, 0xA2, 0x22, 0x44, 0x11, 0x88,
+  0x08, 0x10, 0x04, 0x20, 0x02, 0x40, 0x01, 0x80,
 };

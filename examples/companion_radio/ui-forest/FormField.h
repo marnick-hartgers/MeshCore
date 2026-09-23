@@ -70,14 +70,18 @@ class StepperField : public UIScreen {
   StepperGetFn _get;
   StepperSetFn _set;
   void* _ctx;
-  float _min, _max, _step;
+  // Named _min_val/_max_val, not _min/_max -- the ESP32 Arduino core defines
+  // _min(a,b)/_max(a,b) function-like macros, which broke every ESP32 build
+  // of this file (member names identical to a 2-arg macro name expand at the
+  // member-initializer-list use site, not just at definition).
+  float _min_val, _max_val, _step;
   int _decimals;           // 0 for integer-like fields, >0 for float fields
   float _pending;          // working value, only committed on ENTER
 
 public:
   StepperField(NavStack& nav)
     : _nav(nav), _title(""), _unit(NULL), _get(NULL), _set(NULL), _ctx(NULL),
-      _min(0), _max(0), _step(1), _decimals(0), _pending(0) { }
+      _min_val(0), _max_val(0), _step(1), _decimals(0), _pending(0) { }
 
   void begin(const char* title, const char* unit, StepperGetFn get, StepperSetFn set, void* ctx,
              float min, float max, float step, int decimals);

@@ -8,7 +8,11 @@
 
 class UITask;   // avoid circular include with UITask.h, see Screen_SettingsDevice.cpp
 
-#define UI_SETTINGS_DEVICE_ITEM_COUNT 3
+// Worst case (all optional screens present): Buzzer, GPS, Sensors,
+// Notifications, Shutdown, Restore Defaults. GPS/Sensors rows are
+// conditionally built (see constructor), same #if ENV_INCLUDE_GPS==1 /
+// #if UI_SENSORS_PAGE==1 gating UITask.h already uses for these two screens.
+#define UI_SETTINGS_DEVICE_ITEM_COUNT 6
 
 // Buzzer, notifications entry point, restore defaults (phase-3-settings.md
 // step 6 / phase-7-notifications.md step 3). Phase 7 wires the "Notifications"
@@ -47,6 +51,20 @@ class Screen_SettingsDevice : public MenuScreen {
   static void doRestoreDefaults(void* ctx);
 
 public:
+  // gps/sensors/shutdown: home-dashboard phase (implementation-plan.md Phase
+  // 4) -- Screen_Gps/Screen_Sensors/Screen_Shutdown relocated here as plain
+  // Submenu rows (all three unchanged themselves), now that they're no
+  // longer flat Home rows. gps/sensors mirror UITask.h's own #if
+  // ENV_INCLUDE_GPS==1 / #if UI_SENSORS_PAGE==1 gating -- callers only pass a
+  // real pointer (or omit the argument entirely) when that screen exists in
+  // this build.
   Screen_SettingsDevice(NavStack& nav, ToastOverlay& toast, ConfirmScreen& confirm, UITask* task,
-                        ToggleField& toggleField, UIScreen* notificationSettings);
+                        ToggleField& toggleField, UIScreen* notificationSettings,
+#if ENV_INCLUDE_GPS == 1
+                        UIScreen* gps,
+#endif
+#if UI_SENSORS_PAGE == 1
+                        UIScreen* sensors,
+#endif
+                        UIScreen* shutdown);
 };

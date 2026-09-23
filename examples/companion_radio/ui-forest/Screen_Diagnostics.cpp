@@ -1,7 +1,8 @@
 #include "Screen_Diagnostics.h"
 
 Screen_Diagnostics::Screen_Diagnostics(NavStack& nav, ToastOverlay& toast,
-                                        UIScreen* radio, UIScreen* packets, UIScreen* core, UIScreen* event_log)
+                                        UIScreen* radio, UIScreen* packets, UIScreen* core, UIScreen* event_log,
+                                        UIScreen* recents)
   : MenuScreen(nav, toast, "Diagnostics", _rows, UI_DIAGNOSTICS_ROOT_ITEM_COUNT, /*status_bar_shown=*/true) {
 
   int i = 0;
@@ -19,5 +20,11 @@ Screen_Diagnostics::Screen_Diagnostics(NavStack& nav, ToastOverlay& toast,
 
   _rows[i].label = "Event Log"; _rows[i].icon = NULL; _rows[i].kind = MenuItemKind::Submenu;
   _rows[i].action = NULL; _rows[i].action_ctx = NULL; _rows[i].submenu = event_log;
+  i++;
+
+  // home-dashboard phase: relocated from a flat Home row (Screen_Recents
+  // itself unchanged) now that Home no longer lists it directly.
+  _rows[i].label = "Recently Heard"; _rows[i].icon = NULL; _rows[i].kind = MenuItemKind::Submenu;
+  _rows[i].action = NULL; _rows[i].action_ctx = NULL; _rows[i].submenu = recents;
   i++;
 }

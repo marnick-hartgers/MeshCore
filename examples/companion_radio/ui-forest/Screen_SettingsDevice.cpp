@@ -27,7 +27,14 @@ void Screen_SettingsDevice::confirmRestoreDefaults(void* ctx) {
 }
 
 Screen_SettingsDevice::Screen_SettingsDevice(NavStack& nav, ToastOverlay& toast, ConfirmScreen& confirm, UITask* task,
-                                              ToggleField& toggleField, UIScreen* notificationSettings)
+                                              ToggleField& toggleField, UIScreen* notificationSettings,
+#if ENV_INCLUDE_GPS == 1
+                                              UIScreen* gps,
+#endif
+#if UI_SENSORS_PAGE == 1
+                                              UIScreen* sensors,
+#endif
+                                              UIScreen* shutdown)
   : MenuScreen(nav, toast, "Device", _rows, UI_SETTINGS_DEVICE_ITEM_COUNT, /*status_bar_shown=*/true),
     _nav(nav), _toast(toast), _confirm(confirm), _task(task) {
 
@@ -43,8 +50,32 @@ Screen_SettingsDevice::Screen_SettingsDevice(NavStack& nav, ToastOverlay& toast,
   _rows[i].action = NULL; _rows[i].action_ctx = &_spec_buzzer; _rows[i].submenu = NULL;
   i++;
 
+#if ENV_INCLUDE_GPS == 1
+  // home-dashboard phase: relocated from a flat Home row (Screen_Gps itself
+  // unchanged) -- its Toggle is also promoted directly to the Home dashboard
+  // tile (Screen_HomeDashboard), this row is for the full fix/sats/lat/lon/alt
+  // readout.
+  _rows[i].label = "GPS"; _rows[i].icon = NULL; _rows[i].kind = MenuItemKind::Submenu;
+  _rows[i].action = NULL; _rows[i].action_ctx = NULL; _rows[i].submenu = gps;
+  i++;
+#endif
+
+#if UI_SENSORS_PAGE == 1
+  _rows[i].label = "Sensors"; _rows[i].icon = NULL; _rows[i].kind = MenuItemKind::Submenu;
+  _rows[i].action = NULL; _rows[i].action_ctx = NULL; _rows[i].submenu = sensors;
+  i++;
+#endif
+
   _rows[i].label = "Notifications"; _rows[i].icon = NULL; _rows[i].kind = MenuItemKind::Submenu;
   _rows[i].action = NULL; _rows[i].action_ctx = NULL; _rows[i].submenu = notificationSettings;
+  i++;
+
+  // home-dashboard phase: relocated from a flat Home row (Screen_Shutdown
+  // itself unchanged, still reuses ConfirmScreen's own arm-then-confirm flow)
+  // -- deliberately NOT a Home dashboard tile (plan.md/design-4: rarely used,
+  // high-consequence, shouldn't be one tap away).
+  _rows[i].label = "Shutdown"; _rows[i].icon = NULL; _rows[i].kind = MenuItemKind::Submenu;
+  _rows[i].action = NULL; _rows[i].action_ctx = NULL; _rows[i].submenu = shutdown;
   i++;
 
   _rows[i].label = "Restore Defaults"; _rows[i].icon = NULL; _rows[i].kind = MenuItemKind::Action;

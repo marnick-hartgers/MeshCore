@@ -89,7 +89,12 @@ void SH1106Display::drawRect(int x, int y, int w, int h)
 
 void SH1106Display::drawXbm(int x, int y, const uint8_t *bits, int w, int h)
 {
-  display.drawBitmap(x, y, bits, w, h, SH110X_WHITE);
+  // Honor setColor() like every other draw call here does (fillRect/drawRect/
+  // text) -- this used to hardcode SH110X_WHITE regardless of _color, so an
+  // icon drawn with setColor(DARK) (e.g. a "cutout" on a filled selection
+  // highlight) silently drew white-on-white and disappeared instead of
+  // inverting.
+  display.drawBitmap(x, y, bits, w, h, _color);
 }
 
 uint16_t SH1106Display::getTextWidth(const char *str)

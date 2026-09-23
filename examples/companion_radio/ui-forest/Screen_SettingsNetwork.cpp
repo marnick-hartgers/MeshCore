@@ -125,7 +125,8 @@ void Screen_SettingsNetwork::confirmRestoreDefaults(void* ctx) {
 }
 
 Screen_SettingsNetwork::Screen_SettingsNetwork(NavStack& nav, ToastOverlay& toast, ConfirmScreen& confirm, NodePrefs* node_prefs,
-                                                ToggleField& toggleField, EnumField& enumField, StepperField& stepperField)
+                                                ToggleField& toggleField, EnumField& enumField, StepperField& stepperField,
+                                                UIScreen* bluetooth)
   : MenuScreen(nav, toast, "Network", _rows, UI_SETTINGS_NETWORK_ITEM_COUNT, /*status_bar_shown=*/true),
     _nav(nav), _toast(toast), _confirm(confirm), _node_prefs(node_prefs) {
 
@@ -214,6 +215,13 @@ Screen_SettingsNetwork::Screen_SettingsNetwork(NavStack& nav, ToastOverlay& toas
   _spec_rx_delay.decimals = 2;
 
   int i = 0;
+  // home-dashboard phase: relocated from a flat Home row (Screen_Bluetooth
+  // itself unchanged) -- placed first since it's transport-level, ahead of
+  // the radio-behavior toggles below.
+  _rows[i].label = "Bluetooth"; _rows[i].icon = NULL; _rows[i].kind = MenuItemKind::Submenu;
+  _rows[i].action = NULL; _rows[i].action_ctx = NULL; _rows[i].submenu = bluetooth;
+  i++;
+
   _rows[i].label = "Repeat"; _rows[i].icon = NULL; _rows[i].kind = MenuItemKind::Toggle;
   _rows[i].action = NULL; _rows[i].action_ctx = &_spec_repeat; _rows[i].submenu = NULL;
   i++;

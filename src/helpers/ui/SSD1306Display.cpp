@@ -82,7 +82,12 @@ void SSD1306Display::drawRect(int x, int y, int w, int h) {
 }
 
 void SSD1306Display::drawXbm(int x, int y, const uint8_t* bits, int w, int h) {
-  display.drawBitmap(x, y, bits, w, h, SSD1306_WHITE);
+  // Honor setColor() like every other draw call here does (fillRect/drawRect/
+  // text) -- this used to hardcode SSD1306_WHITE regardless of _color, so an
+  // icon drawn with setColor(DARK) (e.g. a "cutout" on a filled selection
+  // highlight) silently drew white-on-white and disappeared instead of
+  // inverting.
+  display.drawBitmap(x, y, bits, w, h, _color);
 }
 
 uint16_t SSD1306Display::getTextWidth(const char* str) {

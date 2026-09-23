@@ -7,7 +7,7 @@
 #include "FormField.h"
 #include "../NodePrefs.h"
 
-#define UI_SETTINGS_NETWORK_ITEM_COUNT 10
+#define UI_SETTINGS_NETWORK_ITEM_COUNT 11
 
 // Repeat, RX boost, telemetry (base/location/environment), auto-add policy,
 // duty cycle + RX delay factors (phase-3-settings.md step 5). Per-contact-
@@ -53,6 +53,10 @@ class Screen_SettingsNetwork : public MenuScreen {
   static void doRestoreDefaults(void* ctx);
 
 public:
+  // bluetooth: home-dashboard phase (implementation-plan.md Phase 4) --
+  // Screen_Bluetooth relocated here as a plain Submenu row (unchanged itself),
+  // now that it's no longer a flat Home row.
   Screen_SettingsNetwork(NavStack& nav, ToastOverlay& toast, ConfirmScreen& confirm, NodePrefs* node_prefs,
-                         ToggleField& toggleField, EnumField& enumField, StepperField& stepperField);
+                         ToggleField& toggleField, EnumField& enumField, StepperField& stepperField,
+                         UIScreen* bluetooth);
 };

@@ -15,10 +15,6 @@
 #define LED_CYCLE_MILLIS  4000
 #endif
 
-#ifndef STATUS_BAR_SEPARATOR
-  #define STATUS_BAR_SEPARATOR " | "
-#endif
-
 void UITask::begin(DisplayDriver* display, SensorManager* sensors, NodePrefs* node_prefs) {
   _display = display;
   _sensors = sensors;
@@ -39,18 +35,16 @@ void UITask::begin(DisplayDriver* display, SensorManager* sensors, NodePrefs* no
 
   if (_display != NULL) {
     _display->turnOn();
-    _status_bar.begin(_display->width(), _display->isEink());
+    _status_bar.begin();
   }
 
   ui_started_at = millis();
 
   // Constructed once here, matching the "no allocation outside setup" rule
   // ui-new already follows (PLAN.md 3.2/3.6) -- NavStack only ever moves
-  // these pointers around afterward. Leaf screens first, since Home's item
-  // table (built next) needs pointers to all of them.
-  _status = new Screen_Status(_nav, this);
+  // these pointers around afterward. Leaf screens first, since the screens
+  // that reference them (built below) need pointers to all of them.
   _recents = new Screen_Recents(_nav);
-  _radio_info = new Screen_RadioInfo(_nav, node_prefs);
   _bluetooth = new Screen_Bluetooth(_nav, this);
   _advert = new Screen_Advert(_nav, _toast, this);
   _contact_detail = new Screen_ContactDetail(_nav);
@@ -59,15 +53,32 @@ void UITask::begin(DisplayDriver* display, SensorManager* sensors, NodePrefs* no
   // Phase 7: the user-facing notification history -- a top-level Home entry,
   // constructed alongside the other top-level leaf screens above.
   _recent_events_screen = new Screen_RecentEvents(_nav, _recent_events);
+  // home-dashboard phase (Phase 4): constructed here, before _settings_device
+  // below, which now needs pointers to all three (same "leaf screens first"
+  // ordering everything else in this function already follows).
+#if ENV_INCLUDE_GPS == 1
+  _gps = new Screen_Gps(_nav, this);
+#endif
+#if UI_SENSORS_PAGE == 1
+  _sensors_screen = new Screen_Sensors(_nav, this);
+#endif
+  _shutdown_screen = new Screen_Shutdown(_nav, _confirm, this);
   // Phase 3: sub-screens constructed before the root Screen_Settings, which
   // needs pointers to all five (same "leaf screens first" ordering _home
   // itself already follows). Phase 7: _notification_settings constructed
   // before _settings_device, which needs a pointer to it (same ordering).
   _settings_radio = new Screen_SettingsRadio(_nav, _toast, _confirm, node_prefs, _stepper_field, _enum_field, _event_log);
   _settings_advert = new Screen_SettingsAdvert(_nav, _toast, _confirm, node_prefs, _text_field, _toggle_field);
-  _settings_network = new Screen_SettingsNetwork(_nav, _toast, _confirm, node_prefs, _toggle_field, _enum_field, _stepper_field);
+  _settings_network = new Screen_SettingsNetwork(_nav, _toast, _confirm, node_prefs, _toggle_field, _enum_field, _stepper_field, _bluetooth);
   _notification_settings = new Screen_NotificationSettings(_nav, _toast, _toggle_field, _notify_prefs);
-  _settings_device = new Screen_SettingsDevice(_nav, _toast, _confirm, this, _toggle_field, _notification_settings);
+  _settings_device = new Screen_SettingsDevice(_nav, _toast, _confirm, this, _toggle_field, _notification_settings,
+#if ENV_INCLUDE_GPS == 1
+                                                _gps,
+#endif
+#if UI_SENSORS_PAGE == 1
+                                                _sensors_screen,
+#endif
+                                                _shutdown_screen);
   _settings_danger = new Screen_SettingsDanger(_nav, _toast, _confirm, this);
   _settings = new Screen_Settings(_nav, _toast, _settings_radio, _settings_advert, _settings_network, _settings_device, _settings_danger);
   // Phase 4: sub-screens before the root Screen_Diagnostics, same "leaf
@@ -76,127 +87,20 @@ void UITask::begin(DisplayDriver* display, SensorManager* sensors, NodePrefs* no
   _diag_packets = new Screen_DiagPackets(_nav);
   _diag_core = new Screen_DiagCore(_nav);
   _event_log_screen = new Screen_EventLog(_nav, _event_log);
-  _diagnostics = new Screen_Diagnostics(_nav, _toast, _diag_radio, _diag_packets, _diag_core, _event_log_screen);
-#if ENV_INCLUDE_GPS == 1
-  _gps = new Screen_Gps(_nav, this);
-#endif
-#if UI_SENSORS_PAGE == 1
-  _sensors_screen = new Screen_Sensors(_nav, this);
-#endif
-  _shutdown_screen = new Screen_Shutdown(_nav, _confirm, this);
+  _diagnostics = new Screen_Diagnostics(_nav, _toast, _diag_radio, _diag_packets, _diag_core, _event_log_screen, _recents);
 
-  int i = 0;
-  _home_items[i].label = "Status";
-  _home_items[i].icon = NULL;
-  _home_items[i].kind = MenuItemKind::Submenu;
-  _home_items[i].action = NULL;
-  _home_items[i].action_ctx = NULL;
-  _home_items[i].submenu = _status;
-  i++;
-
-  _home_items[i].label = "Recent";
-  _home_items[i].icon = NULL;
-  _home_items[i].kind = MenuItemKind::Submenu;
-  _home_items[i].action = NULL;
-  _home_items[i].action_ctx = NULL;
-  _home_items[i].submenu = _recents;
-  i++;
-
-  _home_items[i].label = "Radio";
-  _home_items[i].icon = NULL;
-  _home_items[i].kind = MenuItemKind::Submenu;
-  _home_items[i].action = NULL;
-  _home_items[i].action_ctx = NULL;
-  _home_items[i].submenu = _radio_info;
-  i++;
-
-  _home_items[i].label = "Bluetooth";
-  _home_items[i].icon = NULL;
-  _home_items[i].kind = MenuItemKind::Submenu;
-  _home_items[i].action = NULL;
-  _home_items[i].action_ctx = NULL;
-  _home_items[i].submenu = _bluetooth;
-  i++;
-
-  _home_items[i].label = "Advert";
-  _home_items[i].icon = NULL;
-  _home_items[i].kind = MenuItemKind::Submenu;
-  _home_items[i].action = NULL;
-  _home_items[i].action_ctx = NULL;
-  _home_items[i].submenu = _advert;
-  i++;
-
-  _home_items[i].label = "Contacts";
-  _home_items[i].icon = NULL;
-  _home_items[i].kind = MenuItemKind::Submenu;
-  _home_items[i].action = NULL;
-  _home_items[i].action_ctx = NULL;
-  _home_items[i].submenu = _contacts;
-  i++;
-
-  _home_items[i].label = "Channels";
-  _home_items[i].icon = NULL;
-  _home_items[i].kind = MenuItemKind::Submenu;
-  _home_items[i].action = NULL;
-  _home_items[i].action_ctx = NULL;
-  _home_items[i].submenu = _channels;
-  i++;
-
-#if ENV_INCLUDE_GPS == 1
-  _home_items[i].label = "GPS";
-  _home_items[i].icon = NULL;
-  _home_items[i].kind = MenuItemKind::Submenu;
-  _home_items[i].action = NULL;
-  _home_items[i].action_ctx = NULL;
-  _home_items[i].submenu = _gps;
-  i++;
-#endif
-
-#if UI_SENSORS_PAGE == 1
-  _home_items[i].label = "Sensors";
-  _home_items[i].icon = NULL;
-  _home_items[i].kind = MenuItemKind::Submenu;
-  _home_items[i].action = NULL;
-  _home_items[i].action_ctx = NULL;
-  _home_items[i].submenu = _sensors_screen;
-  i++;
-#endif
-
-  _home_items[i].label = "Recent Events";
-  _home_items[i].icon = NULL;
-  _home_items[i].kind = MenuItemKind::Submenu;
-  _home_items[i].action = NULL;
-  _home_items[i].action_ctx = NULL;
-  _home_items[i].submenu = _recent_events_screen;
-  i++;
-
-  _home_items[i].label = "Diagnostics";
-  _home_items[i].icon = NULL;
-  _home_items[i].kind = MenuItemKind::Submenu;
-  _home_items[i].action = NULL;
-  _home_items[i].action_ctx = NULL;
-  _home_items[i].submenu = _diagnostics;
-  i++;
-
-  _home_items[i].label = "Settings";
-  _home_items[i].icon = NULL;
-  _home_items[i].kind = MenuItemKind::Submenu;
-  _home_items[i].action = NULL;
-  _home_items[i].action_ctx = NULL;
-  _home_items[i].submenu = _settings;
-  i++;
-
-  _home_items[i].label = "Shutdown";
-  _home_items[i].icon = NULL;
-  _home_items[i].kind = MenuItemKind::Submenu;
-  _home_items[i].action = NULL;
-  _home_items[i].action_ctx = NULL;
-  _home_items[i].submenu = _shutdown_screen;
-  i++;
-
-  _home_item_count = i;
-
-  _home = new MenuScreen(_nav, _toast, "Home", _home_items, _home_item_count, /*status_bar_shown=*/true);
+  // home-dashboard phase: Home is now a fixed 8-tile icon grid instead of a
+  // flat MenuItem[] list -- see Screen_HomeDashboard for the tile layout. It
+  // holds references to the same shared Contacts/Channels/Diagnostics/
+  // Settings/Advert instances constructed above; no new screen instances are
+  // created for them here. Screen_Status and Screen_RadioInfo are gone
+  // entirely (superseded by the status bar + dashboard, and by Settings>Radio
+  // + Diagnostics>Radio respectively, per the Phase 4 field diff); every
+  // other former flat-Home screen (_recents, _bluetooth, _gps,
+  // _sensors_screen, _shutdown_screen) is unchanged itself but now reachable
+  // via Settings/Diagnostics instead of a flat Home row.
+  _home = new Screen_HomeDashboard(_nav, this, _contacts, _channels,
+                                    _diagnostics, _settings, _advert);
   _msg_preview = new Screen_MsgPreview(_nav, _home);
   _splash = new Screen_Splash(_nav, _home);
   _nav.reset(_splash);
@@ -214,17 +118,25 @@ void UITask::msgRead(int msgcount) {
 void UITask::newMsg(uint8_t path_len, const char* from_name, const char* text, int msgcount) {
   _msgcount = msgcount;
 
-  _msg_preview->addPreview(path_len, from_name, text);
-  _nav.reset(_msg_preview);
-
-  if (_display != NULL) {
-    if (!_display->isOn() && !hasConnection()) {
+  // Phase 5 (ambient notification blink, home-dashboard phase): when
+  // connected, the phone app already owns showing the message -- skip the
+  // full-screen Screen_MsgPreview takeover and just flash the status bar's
+  // unread badge (ambient cue only, no nav change, no display wake). When
+  // disconnected, the device is the only place the user will ever see this
+  // message, so keep the previous full-interrupt behavior exactly as-is.
+  if (hasConnection()) {
+    _status_bar.flashUnread();
+  } else {
+    _msg_preview->addPreview(path_len, from_name, text);
+    _nav.reset(_msg_preview);
+    if (_display != NULL && !_display->isOn()) {
       _display->turnOn();
     }
-    if (_display->isOn()) {
-      _auto_off = millis() + AUTO_OFF_MILLIS;  // extend the auto-off timer
-      _next_refresh = 100;  // trigger refresh
-    }
+  }
+
+  if (_display != NULL && _display->isOn()) {
+    _auto_off = millis() + AUTO_OFF_MILLIS;  // extend the auto-off timer
+    _next_refresh = 100;  // trigger refresh
   }
 }
 
@@ -380,41 +292,13 @@ void UITask::userLedHandler() {
 #endif
 }
 
-// Drops every byte that's part of a multi-byte UTF-8 sequence (emoji, accented
-// characters, etc.) instead of substituting a placeholder glyph the way
-// DisplayDriver::translateUTF8ToBlocks() does for Contacts/Recents/message
-// text -- in the status bar's single scrolling line, a run of block
-// characters for a multi-codepoint emoji reads as clutter, so a user-chosen
-// node name containing one should just have it removed, not replaced.
-static void stripNonAscii(char* dest, const char* src, size_t dest_size) {
-  size_t j = 0;
-  for (size_t i = 0; src[i] != 0 && j < dest_size - 1; i++) {
-    unsigned char c = (unsigned char)src[i];
-    if (c < 0x80) dest[j++] = (char)c;   // ASCII byte -- keep
-    // else: continuation/lead byte of a multi-byte UTF-8 sequence -- drop it
-  }
-  dest[j] = 0;
-}
-
 void UITask::updateStatusBar() {
   if (_display == NULL) return;
 
-  char name_buf[sizeof(_node_prefs->node_name)];
-  stripNonAscii(name_buf, _node_prefs->node_name, sizeof(name_buf));
-
-  char buf[160];
-  snprintf(buf, sizeof(buf),
-    "%s" STATUS_BAR_SEPARATOR
-    "BUZ:%s" STATUS_BAR_SEPARATOR
-    "GPS:%s" STATUS_BAR_SEPARATOR
-    UI_FOREST_TRANSPORT_NAME ":%s"
-    " - ",   // trailing gap before the text loops
-    name_buf,
-    isBuzzerQuiet() ? "OFF" : "ON",
-    getGPSState() ? "ON" : "OFF",
-    isSerialEnabled() ? "ON" : "OFF"
-  );
-  _status_bar.setText(*_display, buf);
+  _status_bar.setGpsState(getGpsFixState());
+  _status_bar.setLinkState(getLinkState());
+  _status_bar.setBuzzer(!isBuzzerQuiet());
+  _status_bar.setUnreadCount(_msgcount);
   _status_bar.setBattery(getBattMilliVolts(), isBuzzerQuiet());
 }
 
@@ -590,6 +474,20 @@ bool UITask::getGPSState() {
     }
   }
   return false;
+}
+
+GpsState UITask::getGpsFixState() {
+  if (!getGPSState()) return GpsState::Off;
+  if (_sensors != NULL) {
+    LocationProvider* nmea = _sensors->getLocationProvider();
+    if (nmea != NULL && nmea->isValid()) return GpsState::Fixed;
+  }
+  return GpsState::NoFix;
+}
+
+LinkState UITask::getLinkState() {
+  if (!isSerialEnabled()) return LinkState::Off;
+  return hasConnection() ? LinkState::Connected : LinkState::Disconnected;
 }
 
 void UITask::toggleGPS() {

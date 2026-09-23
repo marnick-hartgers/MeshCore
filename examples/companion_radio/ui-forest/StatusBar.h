@@ -3,27 +3,26 @@
 #include <helpers/ui/DisplayDriver.h>
 #include <stdint.h>
 
-#ifndef STATUS_BAR_SCROLL_MS
-  #define STATUS_BAR_SCROLL_MS 80
-#endif
+// 3-state indicators for the status bar's fixed icon slots (home-dashboard
+// phase, phases/home-dashboard/implementation-plan.md Phase 2.2). Shared with
+// Screen_HomeDashboard (Phase 3), which reuses UITask's same state helpers
+// rather than re-deriving GPS-fix/link state itself.
+enum class GpsState { Off, NoFix, Fixed };
+enum class LinkState { Off, Disconnected, Connected };
 
-// Generalizes ui-tiny's ScrollingStatusBar
-// (examples/companion_radio/ui-tiny/ScrollingStatusBar.h) into an optional,
-// always-rendered top strip shared by every ui-forest screen. Phase 1 gives
-// it real content: setText() is called every loop() with a freshly-built
-// string (name/buzzer/GPS/BLE, mirroring ui-tiny's update()), and
-// setBattery() feeds the battery-percentage icon + muted overlay that used to
-// be drawn per-screen by ui-new's HomeScreen::renderBatteryIndicator()
-// (examples/companion_radio/ui-new/UITask.cpp:112-150) -- now drawn once,
-// here, so every screen gets it for free (PLAN.md 3.2 item 3).
+// Fixed-width top strip of status icons, always rendered on top of whatever
+// screen is currently showing. Replaces ui-tiny's ported marquee/scrolling
+// text bar: with the node name moved to the dashboard's caption line (Phase 3)
+// and every other indicator icon-based, the strip never needs variable-width
+// text again -- no more scroll state, no e-ink-vs-non-eink text branch, no
+// per-frame width math. Every board gets the same static bar.
 class StatusBar {
-  char _text[160];
-  int _text_width;
-  int _scroll_x;
-  int _display_width;
-  unsigned long _next_scroll;
-  bool _needs_redraw;
-  bool _is_eink;
+  GpsState _gps;
+  LinkState _link;
+  bool _buzzer_on;
+  int _unread;
+  bool _dirty;
+  unsigned long _unread_flash_until;   // Phase 5: ambient notification blink
 
   uint16_t _batt_mv;
   bool _muted;
@@ -34,19 +33,25 @@ class StatusBar {
 public:
   StatusBar();
 
-  // is_eink (Phase 5, PLAN.md 3.3's e-ink gating) disables the marquee scroll
-  // entirely -- e-ink panels have no partial/fast-refresh path here (every
-  // DisplayDriver backend's startFrame() does a full clear, and e-ink
-  // additionally has real per-refresh latency/flicker cost), so scrolling
-  // would mean visibly redrawing the whole strip every ~80ms for no benefit.
-  // The truncated/static form is shown instead, matching PLAN.md 3.3's
-  // "no marquee-scrolling StatusBar on e-ink" callout.
-  void begin(int display_width, bool is_eink = false);
+  void begin();
 
-  // Rebuilds cached width only if the text actually changed.
-  void setText(DisplayDriver& display, const char* text);
+  void setGpsState(GpsState s);
+  void setLinkState(LinkState s);
+  void setBuzzer(bool on);
+  void setUnreadCount(int count);   // clamped to "9+" past 9
+
+  // Phase 5 (ambient notification blink while connected): call when a new
+  // message arrives while hasConnection() is true, instead of the full-screen
+  // Screen_MsgPreview takeover. Briefly inverts the unread badge so the cue
+  // is visible on whatever screen the user is currently on -- the status bar
+  // is drawn on top of every screen -- without waking a sleeping display or
+  // stealing focus from it.
+  void flashUnread();
 
   // Caches battery/mute state; marks the bar dirty only if either changed.
+  // Signature unchanged from Phase 1 -- muted no longer drives a drawn icon
+  // here (setBuzzer() owns that in its own slot now), it's kept only as a
+  // dirty-check input.
   void setBattery(uint16_t milliVolts, bool muted);
 
   bool needsRedraw() const;
